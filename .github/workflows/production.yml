@@ -47,7 +47,7 @@ jobs:
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.ZIZ_TELEGRAM_BOT_TOKEN }}/sendPhoto" \
           -F chat_id="${{ secrets.ZIZ_TELEGRAM_CHAT_ID }}" \
-          -F photo="@./public/assets/images/logo2.png" \
+          -F photo="@./public/logo.png" \
           -F parse_mode=HTML \
           -F caption="$caption"
 
@@ -104,7 +104,7 @@ jobs:
 
       - name: Проверка и создание сети Docker (если отсутствует)
         run: |
-          docker network inspect inmebel_network >/dev/null 2>&1 || docker network create inmebel_network
+          docker network inspect keneshub_network >/dev/null 2>&1 || docker network create keneshub_network
 
       - name: Остановка старого контейнера (если существует)
         run: |
