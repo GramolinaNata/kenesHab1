@@ -28,7 +28,6 @@ RUN --mount=type=cache,id=yarn-cache,target=/root/.cache/yarn \
 # Копируем .env и файлы конфигурации.
 # Этот слой кэшируется, даже если вы меняете код в /src
 COPY .env.production ./
-COPY next.config.ts ./
 COPY tsconfig.json ./
 
 
