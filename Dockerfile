@@ -19,7 +19,7 @@ RUN corepack enable && corepack use yarn
 # Копируем только то, что нужно для 'yarn install'
 # Этот слой будет кэшироваться, пока yarn.lock не изменится
 COPY package.json yarn.lock* .yarnrc.yml* .npmrc* ./
-COPY .yarn ./.yarn
+
 
 RUN --mount=type=cache,id=yarn-cache,target=/root/.cache/yarn \
     yarn install --immutable --inline-builds
