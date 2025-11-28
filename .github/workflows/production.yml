@@ -325,7 +325,7 @@ jobs:
         shell: bash
         run: |
           CURL_EXIT_CODE=0
-          curl --max-time 30 -f http://127.0.0.1:3000 > curl.log 2>&1 || CURL_EXIT_CODE=$?
+          curl --max-time 30 -f http://127.0.0.1:13333 > curl.log 2>&1 || CURL_EXIT_CODE=$?
 
           if [[ $CURL_EXIT_CODE -ne 0 ]]; then
             echo "Healthcheck (curl) упал с кодом $CURL_EXIT_CODE." > healthcheck_error.txt

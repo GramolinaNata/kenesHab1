@@ -13,12 +13,12 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',  // Важно для Docker
-    port: 3000,
+    port: 13333,
     strictPort: true,  // Не менять порт если 3000 занят
   },
   preview: {
     host: '0.0.0.0',  // Для production билда
-    port: 3000,
+    port: 13333,
     strictPort: true,
   }
 })
