@@ -17,7 +17,7 @@ services:
 networks:
   app_net: # 4. Статический ключ
     name: ${APP_NETWORK} # 5. Динамическое ИМЯ из переменной
-    external: true
+    external: false
   proxy_net: # 6. Статический ключ
     name: ${NGINX_NETWORK} # 7. Динамическое ИМЯ из переменной
-    external: true
+    external: false
