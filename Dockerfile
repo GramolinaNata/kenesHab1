@@ -30,7 +30,7 @@ RUN --mount=type=cache,id=yarn-cache,target=/root/.cache/yarn \
 COPY .env.production ./
 COPY next.config.ts ./
 COPY tsconfig.json ./
-COPY postcss.config.mjs ./
+
 
 
 # --- Слой 3: Исходный код ---
