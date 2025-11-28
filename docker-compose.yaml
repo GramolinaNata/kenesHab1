@@ -1,0 +1,16 @@
+services:
+  keneshub_frontend:
+    container_name: keneshub_frontend
+    build:
+      cache_from:
+        - keneshub_frontend:latest
+    image: keneshub_frontend
+    restart: always
+    ports:
+      - "14000:3000"
+    env_file:
+      - .env.production
+
+networks:
+  keneshub_network:
+    external: true
