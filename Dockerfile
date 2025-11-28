@@ -37,6 +37,7 @@ COPY tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts ./
 # (Все ваши 'README.md', 'docs/', '.idea/' и т.д. теперь ИГНОРИРУЮТСЯ)
 COPY src ./src
 COPY public ./public
+COPY index.html ./
 
 # Передаем build-аргументы
 ARG SITEMAP_BUILD_DISABLED=1
