@@ -63,7 +63,7 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 USER nextjs
-EXPOSE 3000
-ENV PORT=3000
+EXPOSE 5173
+ENV PORT=5173
 
 CMD HOSTNAME="0.0.0.0" node server.js
