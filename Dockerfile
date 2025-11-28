@@ -66,4 +66,4 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 
-CMD HOSTNAME="0.0.0.0" node server.js
+CMD ["yarn", "preview", "--host", "0.0.0.0", "--port", "3000"]
