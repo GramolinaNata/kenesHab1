@@ -20,4 +20,4 @@ networks:
     external: true
   proxy_net: # 6. Статический ключ
     name: ${NGINX_NETWORK} # 7. Динамическое ИМЯ из переменной
-    external: true
+    external: false
