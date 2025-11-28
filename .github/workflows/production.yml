@@ -2,12 +2,14 @@ name: Next.js CI/CD
 
 on:
   push:
-    branches: ["main"]
+    branches: ["master"]
   workflow_dispatch:
 
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: false
+env:
+  NEXT_TELEMETRY_DISABLED: 1
 
 jobs:
   notify_start:
@@ -16,35 +18,54 @@ jobs:
     outputs:
       start_time: ${{ steps.record_start_time.outputs.start_time }}
     steps:
-      # 2. Добавьте этот шаг для записи времени
       - name: Запись времени начала
         id: record_start_time
         run: echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Collect context (actor, commit msg)
+        id: context
+        shell: bash
+        run: |
+          echo "actor=${GITHUB_ACTOR}" >> "$GITHUB_OUTPUT"
+
+          # "Очистка" сообщения коммита:
+          RAW_MSG="${{ github.event.head_commit.message }}"
+
+          # 2. (САМОЕ ВАЖНОЕ) Заменяем переносы строк на пробелы, чтобы не сломать curl -F
+          CLEAN_MSG=$(echo "$RAW_MSG" | tr '\n' ' ')
+
+          echo "commit_msg=$CLEAN_MSG" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
 
       - name: Отправить стартовое уведомление в Telegram
         run: |
-          actor="${{ github.actor }}"
+          # 1. Получаем переменные
+          actor="${{ steps.context.outputs.actor }}"
+          commit_msg="${{ steps.context.outputs.commit_msg }}"
           branch="${{ github.ref_name }}"
-          short_sha="${{ github.sha }}"; short_sha="${short_sha:0:7}"
           run_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          # не режем сообщение жёстко, но следим за лимитом caption (1024)
-          msg="$(echo "${{ github.event.head_commit.message }}" | tr '\n' ' ' )"
+          short_sha="${{ github.sha }}"; short_sha="${short_sha:0:7}"
 
-          # HTML-эскейп (только &, <, >)
+          # 2. Функция для HTML-эскейпинга (заменяет &, <, >)
           esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
-          actor_h=$(printf %s "$actor"    | esc)
-          branch_h=$(printf %s "$branch"  | esc)
-          sha_h=$(printf %s "$short_sha"  | esc)
-          msg_h=$(printf %s "$msg"        | esc)
-          url_h=$(printf %s "$run_url"    | esc)
+          # 3. "Очищаем" все переменные
+          actor_h=$(printf %s "$actor" | esc)
+          msg_h=$(printf %s "$commit_msg" | esc)
+          branch_h=$(printf %s "$branch" | esc)
+          url_h=$(printf %s "$run_url" | esc)
+          sha_h=$(printf %s "$short_sha" | esc)
 
-          caption="🚀 <b>${actor_h}</b> — <code>${branch_h}@${sha_h}</code>
-          ✍️${msg_h}
-          🔗 ${url_h}"
+          caption="🚀 <b>Сборка началась</b>
+          💻: ${{ vars.PROJECT_NAME }}
+          🌐: <a href=\"${{ vars.PROJECT_URL }}\">${{ vars.PROJECT_URL }}</a>
+          🌿: <code>${branch_h}@${sha_h}</code>
+          👤: ${actor_h}
+          ✍️: ${msg_h}
+          🔗 <a href=\"${url_h}\">Открыть run</a>"
 
+          # 4. Отправляем
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.ZIZ_TELEGRAM_BOT_TOKEN }}/sendPhoto" \
           -F chat_id="${{ secrets.ZIZ_TELEGRAM_CHAT_ID }}" \
           -F photo="@./public/logo.png" \
@@ -54,21 +75,62 @@ jobs:
   lint_and_typecheck:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      failure_step: ${{ steps.report_failure.outputs.failure_step }}
+      failure_log: ${{ steps.report_failure.outputs.failure_log }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (для 'git diff')
+        uses: actions/checkout@v4
+        with:
+          # Нам нужна вся история для 'git diff'
+          fetch-depth: 0
 
+      # ⬇️ ⬇️ ⬇️ ИЗМЕНЕНИЕ 1: 'tj-actions' ЗАМЕНЕН НА 'git diff' ⬇️ ⬇️ ⬇️
+      - name: Check for relevant file changes (только для 'push')
+        id: check_push
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          # 1. Получаем список всех измененных файлов между 'before' и 'after'
+          # '|| true' нужен, чтобы 'git' не завершился с ошибкой, если 'before' - это 0000... (первый коммит)
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} || true)
+
+          if [[ -z "$CHANGED_FILES" ]]; then
+            echo "Нет измененных файлов."
+            echo "files_changed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "--- Измененные файлы ---"
+          echo "$CHANGED_FILES"
+          echo "-------------------------"
+
+          # 2. Список паттернов для проверки (src/, package.json, и т.д.)
+          # 'grep -E' использует расширенный regex
+          # 'grep -q' (quiet) просто вернет код 0 (найдено) или 1 (не найдено)
+          if echo "$CHANGED_FILES" | grep -qE "(^src/|^package\.json$|^yarn\.lock$|^tsconfig\.json$|^next\.config\.ts$|^postcss\.config\.js$|^eslint\.config\.mjs$)"; then
+            echo "Обнаружены изменения в коде. Запускаем Lint."
+            echo "files_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Изменения не затрагивают код. Пропускаем Lint."
+            echo "files_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      # ⬇️ ⬇️ ⬇️ ИЗМЕНЕНИЕ 2: 'if' теперь ссылается на 'steps.check_push' ⬇️ ⬇️ ⬇️
       - uses: actions/setup-node@v4
+        if: github.event_name == 'workflow_dispatch' || steps.check_push.outputs.files_changed == 'true'
         with:
           node-version: 20
-          # не используем cache: yarn, чтобы setup-node не дергал Yarn 1
 
       - name: Enable Corepack & Yarn 4
+        if: github.event_name == 'workflow_dispatch' || steps.check_push.outputs.files_changed == 'true'
         run: |
           corepack enable
           corepack prepare yarn@4.10.3 --activate
           yarn -v
 
       - name: Cache yarn files
+        if: github.event_name == 'workflow_dispatch' || steps.check_push.outputs.files_changed == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -77,105 +139,378 @@ jobs:
           key: yarn-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install deps
-        run: yarn install --immutable
+        if: github.event_name == 'workflow_dispatch' || steps.check_push.outputs.files_changed == 'true'
+        id: install_deps
+        shell: bash
+        run: |
+          set -o pipefail
+          yarn install --immutable 2>&1 | tee install.log
 
       - name: Lint
-        run: yarn lint
+        if: github.event_name == 'workflow_dispatch' || steps.check_push.outputs.files_changed == 'true'
+        id: lint
+        shell: bash
+        run: |
+          set -o pipefail
+          yarn lint 2>&1 | tee lint.log
 
       - name: Typecheck
-        run: yarn tsc -p tsconfig.json --noEmit
+        if: github.event_name == 'workflow_dispatch' || steps.check_push.outputs.files_changed == 'true'
+        id: typecheck
+        shell: bash
+        run: |
+          set -o pipefail
+          yarn tsc -p tsconfig.json --noEmit 2>&1 | tee tsc.log
 
-  deploy:
+      - name: Report failure reason
+        if: always()
+        id: report_failure
+        shell: bash
+        run: |
+          if [[ "${{ job.status }}" != "failure" ]]; then
+            exit 0
+          fi
+          step_name=""
+          log_file=""
+          if [[ "${{ steps.install_deps.outcome }}" == "failure" ]]; then
+            step_name="yarn install"
+            log_file="install.log"
+          elif [[ "${{ steps.lint.outcome }}" == "failure" ]]; then
+            step_name="yarn lint"
+            log_file="lint.log"
+          elif [[ "${{ steps.typecheck.outcome }}" == "failure" ]]; then
+            step_name="yarn tsc"
+            log_file="tsc.log"
+          else
+            # ⬇️ ⬇️ ⬇️ ИЗМЕНЕНИЕ 3: Проверяем 'steps.check_push' ⬇️ ⬇️ ⬇️
+            if [[ "${{ steps.check_push.outcome }}" == "failure" ]]; then
+              step_name="Check changed files (git diff)"
+            else
+              step_name="неизвестный шаг"
+            fi
+          fi
+          echo "failure_step=$step_name" >> $GITHUB_OUTPUT
+          if [[ -f "$log_file" ]]; then
+            echo "--- Лог (последние 15 строк) ---" > full_error_log.txt
+            tail -n 15 "$log_file" >> full_error_log.txt
+            echo "failure_log<<EOF" >> $GITHUB_OUTPUT
+            cat full_error_log.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "failure_log=Лог-файл для этого шага не найден." >> $GITHUB_OUTPUT
+          fi
+
+  build_docker:
     runs-on: self-hosted
     timeout-minutes: 10
-    needs: [lint_and_typecheck]
+    outputs:
+      failure_step: ${{ steps.report_failure.outputs.failure_step }}
+      failure_log: ${{ steps.report_failure.outputs.failure_log }}
     steps:
       - name: Checkout репозитория
         uses: actions/checkout@v4
 
-      # 2. ИСПРАВЛЕНО: Файл теперь называется .env.production
-      - name: Создание .env.production файла из GitHub Variables
+      - name: Создание .env.production файла
+        id: create_env
         run: |
           echo "AUTH_SECRET=${{ secrets.AUTH_SECRET }}" >> .env.production
           echo "AUTH_URL=${{ vars.AUTH_URL }}" >> .env.production
           echo "NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}" >> .env.production
           echo "API_URL=${{ vars.API_URL }}" >> .env.production
           echo "NODE_ENV=${{ vars.NODE_ENV }}" >> .env.production
+          echo "NEXT_TELEMETRY_DISABLED=1" >> .env.production
+          echo "NEXT_PUBLIC_USE_MOCK=1" >> .env.production
+          echo "USE_MOCK=1" >> .env.production
 
-      - name: Проверка и создание сети Docker (если отсутствует)
+      - name: Проверка и создание сетей Docker
+        id: network
         run: |
-          docker network inspect keneshub_network >/dev/null 2>&1 || docker network create keneshub_network
+          docker network inspect ${{ vars.APP_NETWORK }} >/dev/null 2>&1 || docker network create ${{ vars.APP_NETWORK }}
 
-      - name: Остановка старого контейнера (если существует)
+      - name: Сборка нового образа (Build)
+        id: docker_build
+        shell: bash
+        env:
+          CONTAINER_NAME: ${{ vars.CONTAINER_NAME }}
+          APP_NETWORK: ${{ vars.APP_NETWORK }}
         run: |
-          if docker ps -q --filter "name=logoped_frontend" | grep -q .; then
-            docker stop logoped_frontend || true
-            docker rm   logoped_frontend || true
+          set -o pipefail
+          docker compose build 2>&1 | tee docker_build.log
+
+      - name: Report failure reason
+        if: always()
+        id: report_failure
+        shell: bash
+        run: |
+          if [[ "${{ job.status }}" != "failure" ]]; then
+            exit 0
           fi
 
-      - name: Запуск нового контейнера (сборка + запуск)
-        run: docker compose up -d --build
+          step_name=""
+          log_file=""
+
+          if [[ "${{ steps.docker_build.outcome }}" == "failure" ]]; then
+            step_name="docker compose build"
+            log_file="docker_build.log"
+          elif [[ "${{ steps.create_env.outcome }}" == "failure" ]]; then
+            step_name="Создание .env"
+          elif [[ "${{ steps.network.outcome }}" == "failure" ]]; then
+            step_name="Настройка сети"
+          else
+            step_name="неизвестный шаг"
+          fi
+
+          echo "failure_step=$step_name" >> $GITHUB_OUTPUT
+
+          if [[ -f "$log_file" ]]; then
+            echo "--- Лог (последние 15 строк) ---" > full_error_log.txt
+            tail -n 15 "$log_file" >> full_error_log.txt
+            echo "failure_log<<EOF" >> $GITHUB_OUTPUT
+            cat full_error_log.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "failure_log=Лог-файл для этого шага не найден." >> $GITHUB_OUTPUT
+          fi
+
+  deploy:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    needs: [lint_and_typecheck, build_docker]
+    outputs:
+      failure_step: ${{ steps.report_failure.outputs.failure_step }}
+      failure_log: ${{ steps.report_failure.outputs.failure_log }}
+    steps:
+      - name: Checkout репозитория
+        uses: actions/checkout@v4
+
+      - name: Создание .env.production файла
+        id: create_env
+        run: |
+          echo "AUTH_SECRET=${{ secrets.AUTH_SECRET }}" >> .env.production
+          echo "AUTH_URL=${{ vars.AUTH_URL }}" >> .env.production
+          echo "NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}" >> .env.production
+          echo "API_URL=${{ vars.API_URL }}" >> .env.production
+          echo "NODE_ENV=${{ vars.NODE_ENV }}" >> .env.production
+          echo "NEXT_PUBLIC_USE_MOCK=${{ vars.NEXT_PUBLIC_USE_MOCK }}" >> .env.production
+          echo "USE_MOCK=${{ vars.USE_MOCK }}" >> .env.production
+          echo "NEXT_TELEMETRY_DISABLED=1" >> .env.production
+
+      - name: Остановка старого контейнера
+        id: stop_old
+        run: |
+          if docker ps -q --filter "name=${{ vars.CONTAINER_NAME }}" | grep -q .; then
+            docker stop ${{ vars.CONTAINER_NAME }} || true
+            docker rm   ${{ vars.CONTAINER_NAME }} || true
+          fi
+
+      - name: Запуск нового контейнера (Deploy/Up)
+        id: docker_up
+        shell: bash
+        env:
+          CONTAINER_NAME: ${{ vars.CONTAINER_NAME }}
+          APP_NETWORK: ${{ vars.APP_NETWORK }}
+          NGINX_NETWORK: ${{ vars.NGINX_NETWORK }}
+        run: |
+          set -o pipefail
+          # Используем --no-build, т.к. 'build_docker' job уже все собрал
+          docker compose up -d --no-build 2>&1 | tee docker_up.log
+
+      - name: Ожидание запуска Next.js
+        run: |
+          echo "Даем Next.js 5 секунд на запуск..."
+          sleep 5
 
       - name: Проверка работоспособности контейнера
-        run: curl --max-time 30 -f http://127.0.0.1:3000 || echo "Контейнер не доступен"
+        id: healthcheck
+        shell: bash
+        run: |
+          CURL_EXIT_CODE=0
+          curl --max-time 30 -f http://127.0.0.1:3000 > curl.log 2>&1 || CURL_EXIT_CODE=$?
+
+          if [[ $CURL_EXIT_CODE -ne 0 ]]; then
+            echo "Healthcheck (curl) упал с кодом $CURL_EXIT_CODE." > healthcheck_error.txt
+            cat curl.log >> healthcheck_error.txt
+            echo "--- (Конец лога curl) ---" >> healthcheck_error.txt
+            exit 1
+          fi
+
+      - name: Report failure reason
+        if: always()
+        id: report_failure
+        shell: bash
+        run: |
+          if [[ "${{ job.status }}" != "failure" ]]; then
+            exit 0
+          fi
+
+          step_name=""
+          log_file=""
+
+          # 'docker_build' ушел в другой job, проверяем 'docker_up'
+          if [[ "${{ steps.docker_up.outcome }}" == "failure" ]]; then
+            step_name="docker compose up --no-build"
+            log_file="docker_up.log"
+          elif [[ "${{ steps.healthcheck.outcome }}" == "failure" ]]; then
+            step_name="Healthcheck (curl)"
+            log_file="healthcheck_error.txt"
+          elif [[ "${{ steps.create_env.outcome }}" == "failure" ]]; then
+            step_name="Создание .env"
+          else
+            step_name="неизвестный шаг"
+          fi
+
+          echo "failure_step=$step_name" >> $GITHUB_OUTPUT
+
+          if [[ -f "$log_file" ]]; then
+            echo "--- Лог (последние 15 строк) ---" > full_error_log.txt
+            tail -n 15 "$log_file" >> full_error_log.txt
+            echo "failure_log<<EOF" >> $GITHUB_OUTPUT
+            cat full_error_log.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "failure_log=Лог-файл для этого шага не найден." >> $GITHUB_OUTPUT
+          fi
 
   notify_end:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [notify_start, deploy, lint_and_typecheck]
+    needs: [notify_start, deploy, lint_and_typecheck, build_docker]
     steps:
       - name: Сформировать текст и длительность
         id: prep
         shell: bash
+        env:
+          LINT_RESULT_IN: "${{ needs.lint_and_typecheck.result }}"
+          LINT_STEP_IN: "${{ needs.lint_and_typecheck.outputs.failure_step }}"
+          LINT_LOG_IN: "${{ needs.lint_and_typecheck.outputs.failure_log }}"
+
+          BUILD_RESULT_IN: "${{ needs.build_docker.result }}"
+          BUILD_STEP_IN: "${{ needs.build_docker.outputs.failure_step }}"
+          BUILD_LOG_IN: "${{ needs.build_docker.outputs.failure_log }}"
+
+          DEPLOY_RESULT_IN: "${{ needs.deploy.result }}"
+          DEPLOY_STEP_IN: "${{ needs.deploy.outputs.failure_step }}"
+          DEPLOY_LOG_IN: "${{ needs.deploy.outputs.failure_log }}"
+
+          START_TIME_IN: "${{ needs.notify_start.outputs.start_time }}"
+          COMMIT_MSG_IN: "${{ github.event.head_commit.message }}"
+          ACTOR_IN: "${{ github.actor }}"
+
         run: |
-          # 2. Удалите 'BUILD_RESULT' (он больше не существует)
-          DEPLOY_RESULT="${{ needs.deploy.result }}"
-          LINT_RESULT="${{ needs.lint_and_typecheck.result }}"
+          get_status_emoji() {
+            case "$1" in
+              success)   echo "✅" ;;
+              failure)   echo "❌" ;;
+              cancelled) echo "⏹️" ;;
+              skipped)   echo "⏭️" ;;
+              *)         echo "❓" ;;
+            esac
+          }
 
+          # Получаем ВСЕ три результата
+          DEPLOY_RESULT="$DEPLOY_RESULT_IN"
+          LINT_RESULT="$LINT_RESULT_IN"
+          BUILD_RESULT="$BUILD_RESULT_IN"
+
+          DEPLOY_EMOJI=$(get_status_emoji "$DEPLOY_RESULT")
+          LINT_EMOJI=$(get_status_emoji "$LINT_RESULT")
+          BUILD_EMOJI=$(get_status_emoji "$BUILD_RESULT")
+
+          # Обновляем строку статуса
+          STATUS_LINE="Lint: $LINT_EMOJI | Build: $BUILD_EMOJI | Deploy: $DEPLOY_EMOJI"
+
+          # Обновляем логику поиска ошибки
           OVERALL="success"
-          # 3. Удалите 'BUILD_RESULT' из цикла
-          for r in "$DEPLOY_RESULT" "$LINT_RESULT"; do
-            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then OVERALL="$r"; fi
-          done
+          FAIL_JOB=""
+          FAIL_STEP=""
+          FAIL_LOG=""
+          if [[ "$LINT_RESULT" == "failure" ]]; then
+            OVERALL="failure"
+            FAIL_JOB="Lint & Typecheck"
+            FAIL_STEP="$LINT_STEP_IN" 
+            FAIL_LOG="$LINT_LOG_IN"   
+          elif [[ "$LINT_RESULT" == "cancelled" ]]; then
+            OVERALL="cancelled"
+          fi
 
-          # 4. ИСПРАВЛЕНА ЛОГИКА ВРЕМЕНИ:
-          #    Получаем 'start_time' из 'outputs' job'а 'notify_start'
-          START="${{ needs.notify_start.outputs.start_time }}"
-          END=$(date +%s)
-          DURATION=$(( END - START ))
-          # --------------------------------
+          if [[ "$BUILD_RESULT" == "failure" ]]; then
+            OVERALL="failure"
+            FAIL_JOB="Docker Build"
+            FAIL_STEP="$BUILD_STEP_IN"
+            FAIL_LOG="$BUILD_LOG_IN"  
+          elif [[ "$BUILD_RESULT" == "cancelled" ]]; then
+            OVERALL="cancelled"
+          fi
 
-          COMMIT_MSG="$(echo "${{ github.event.head_commit.message }}" | tr '\n' ' ' | sed 's/[^a-zA-Z0-9 _-]//g')"
-          ACTOR="${{ github.actor }}"
-          # 5. ИСПРАВЛЕНА СТРОКА СТАТУСА (убрали 'Build')
-          STATUS_LINE="Deploy: $DEPLOY_RESULT | Lint: $LINT_RESULT"
+          if [[ "$DEPLOY_RESULT" == "failure" ]]; then
+            OVERALL="failure"
+            FAIL_JOB="Deploy"
+            FAIL_STEP="$DEPLOY_STEP_IN"
+            FAIL_LOG="$DEPLOY_LOG_IN"  
+          elif [[ "$DEPLOY_RESULT" == "cancelled" ]]; then
+            OVERALL="cancelled"
+          fi
 
+          # --- Остальная логика (без изменений) ---
           case "$OVERALL" in
             success)   TITLE="✅: Деплой успешно завершён" ;;
             cancelled) TITLE="⏹️: Пайплайн отменён" ;;
-            *)         TITLE="❌: Ошибка пайплайна" ;;
+            *)         TITLE="❌: Ошибка в '$FAIL_JOB'" ;;
           esac
 
+          START="${{ needs.notify_start.outputs.start_time }}"
+          END=$(date +%s)
+          DURATION=$(( END - START ))
+          COMMIT_MSG="$(echo "${{ github.event.head_commit.message }}" | tr '\n' ' ')"
+          ACTOR="${{ github.actor }}"
+
           echo "title=$TITLE"             >> $GITHUB_OUTPUT
-          echo "duration=$DURATION"       >> $GITHUB_OUTPUT # <-- Теперь здесь будет правильное значение (около 168с)
+          echo "duration=$DURATION"       >> $GITHUB_OUTPUT
           echo "status_line=$STATUS_LINE" >> $GITHUB_OUTPUT
           echo "actor=$ACTOR"             >> $GITHUB_OUTPUT
           echo "commit_msg=$COMMIT_MSG"   >> $GITHUB_OUTPUT
 
-      - name: Оповещение в Telegram — итог
-        run: |
-          TITLE="${{ steps.prep.outputs.title }}"
-          DURATION="${{ steps.prep.outputs.duration }}"
-          STATUS_LINE="${{ steps.prep.outputs.status_line }}"
-          ACTOR="${{ steps.prep.outputs.actor }}"
-          COMMIT="${{ steps.prep.outputs.commit_msg }}"
-          BRANCH="${{ github.ref_name }}"
-          SHORT_SHA="${{ github.sha }}"; SHORT_SHA="${SHORT_SHA:0:7}"
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          PROJECT="${{ vars.PROJECT_NAME }}"
+          echo "error_details<<EOF" >> $GITHUB_OUTPUT
+          if [[ "$OVERALL" != "success" ]]; then
+            if [[ -n "$FAIL_STEP" ]]; then
+              echo "Причина: $FAIL_STEP" >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
+              echo "$FAIL_LOG" >> $GITHUB_OUTPUT
+            else
+              echo "Причина сбоя не была передана (job: $FAIL_JOB)." >> $GITHUB_OUTPUT
+            fi
+          fi
+          echo "EOF" >> $GITHUB_OUTPUT
 
-          # Экраним только &, <, >
+      - name: Оповещение в Telegram — итог
+        env:
+          TITLE_IN: "${{ steps.prep.outputs.title }}"
+          DURATION_IN: "${{ steps.prep.outputs.duration }}"
+          STATUS_LINE_IN: "${{ steps.prep.outputs.status_line }}"
+          ACTOR_IN: "${{ steps.prep.outputs.actor }}"
+          COMMIT_IN: "${{ steps.prep.outputs.commit_msg }}"
+          ERROR_DETAILS_IN: "${{ steps.prep.outputs.error_details }}" # <-- Ең маңыздысы
+
+          BRANCH_IN: "${{ github.ref_name }}"
+          SHA_IN: "${{ github.sha }}"
+          RUN_URL_IN: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          PROJECT_IN: "${{ vars.PROJECT_NAME }}"
+          PROJECT_URL_IN: "${{ vars.PROJECT_URL }}"
+        run: |
+          # ⬇️ ⬇️ ⬇️ Енді env-тан оқимыз (бұл қауіпсіз) ⬇️ ⬇️ ⬇️
+          TITLE="${TITLE_IN}"
+          DURATION="${DURATION_IN}"
+          STATUS_LINE="${STATUS_LINE_IN}"
+          ACTOR="${ACTOR_IN}"
+          COMMIT="${COMMIT_IN}"
+          BRANCH="${BRANCH_IN}"
+          SHORT_SHA="${SHA_IN}"; SHORT_SHA="${SHORT_SHA:0:7}"
+          RUN_URL="${RUN_URL_IN}"
+          PROJECT="${PROJECT_IN}"
+          PROJECT_URL="${PROJECT_URL_IN}"
+          ERROR_DETAILS="${ERROR_DETAILS_IN}" # <-- Қауіпсіз түрде алынды
+
           esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
           TITLE_E=$(printf %s "$TITLE"      | esc)
@@ -187,15 +522,24 @@ jobs:
           SHA_E=$(printf %s "$SHORT_SHA"    | esc)
           RUN_URL_E=$(printf %s "$RUN_URL"  | esc)
           PROJECT_E=$(printf %s "$PROJECT"  | esc)
+          ERROR_DETAILS_E=$(printf %s "$ERROR_DETAILS" | esc) # ⬅️ Енді бұл қатар қауіпсіз
 
           TEXT="<b>${TITLE_E}</b>
           💻: ${PROJECT_E}
+          🌐: <a href=\"${PROJECT_URL}\">${PROJECT_URL}</a>
           🌿: <code>${BRANCH_E}@${SHA_E}</code>
           👤: ${ACTOR_E}
           ✍️: ${COMMIT_E}
           ⏱️: ${DURATION_E} c
           📊: ${STATUS_E}
           🔗 <a href=\"${RUN_URL_E}\">Открыть run</a>"
+
+          if [[ -n "$ERROR_DETAILS" ]]; then
+            TEXT="${TEXT}
+
+          ---
+          <pre><code>${ERROR_DETAILS_E}</code></pre>"
+          fi
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.ZIZ_TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -d chat_id="${{ secrets.ZIZ_TELEGRAM_CHAT_ID }}" \
@@ -213,4 +557,4 @@ jobs:
           docker image prune -af
           docker container prune -f
           docker network prune -f
-  #         docker builder prune -af
+          # docker builder prune -af
