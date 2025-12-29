@@ -9,7 +9,7 @@ services:
     env_file:
       - .env.production
     ports:
-      - "127.0.0.1:13333:3000"
+      - "127.0.0.1:3000:3000"
     networks:
       - app_net
       - proxy_net

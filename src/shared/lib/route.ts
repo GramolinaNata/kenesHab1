@@ -7,6 +7,7 @@ export const Select = lazy(() => import("../../pages/auth/select/select"));
 
 // Main компоненты
 export const Home = lazy(() => import("../../pages/main/home/home"));
+export const Profile = lazy(() => import("../../pages/main/profile/profile"));
 
 //Detali Компоненты
 export const CreateStatment = lazy(() => import("../../pages/detali/statement/create-statement"));
@@ -16,7 +17,30 @@ export const CreateOmbudsman = lazy(() => import("../../pages/detali/ombudsman/c
 
 export const ShowAppeals = lazy(() => import("../../pages/detali/appeals/show/show-appeals"));
 
+//MFO Компоненты
+export const HomeMFO = lazy(() => import("../../pages/mfo/home/home"));
+
+//Detali MFO Компоненты
+export const ShowAppealsMFO = lazy(() => import("../../pages/mfo/home/detali/Appeals"));
+
+//Laywer Компоненты
+export const HomeLaywer = lazy(() => import("../../pages/laywer/home/home"));
+
+//Detali Laywer Компоненты
+export const ShowAppealsLaywer = lazy(() => import("../../pages/laywer/home/detali/Appeals"));
+//Mediator Компоненты
+export const HomeMediator = lazy(() => import("../../pages/mediator/home/home"));
+
+//Detali Mediator Компоненты
+export const ShowAppealsMediator = lazy(() => import("../../pages/mediator/home/detali/Appeals"));
+//Ombudsman Компоненты
+export const HomeOmbudsman = lazy(() => import("../../pages/ombudsman/home/home"));
+
+//Detali Ombudsman Компоненты
+export const ShowAppealsOmbudsman = lazy(() => import("../../pages/ombudsman/home/detali/Appeals"));
+
 // Layout компоненты
 export const AuthLayout = lazy(() => import("../../pages/auth/layout"));
 export const MainLayout = lazy(() => import("../../pages/main/layout"));
 export const DetaliLayout = lazy(() => import("../../pages/detali/layout"));
+export const MFOLayout = lazy(() => import("../../pages/mfo/layout"));
