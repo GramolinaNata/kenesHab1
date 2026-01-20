@@ -29,13 +29,13 @@ export const Message = (id: number) =>
    clientApi.post(`/api/applications/${id}/messages`)
 
 export const Otp = (id: number) =>
-   clientApi.post(`/api/applications/${id}/request-otp`)
+   clientApi.post(`/api/applications/${id}/request-otp/`)
 
 export const SendEmail = (id: number) =>
-   clientApi.post(`/api/applications/${id}/send-email`)
+   clientApi.post(`/api/applications/${id}/send-email/`)
 
 export const SetStatus = (id: number, payload: any) =>
   clientApi.post(`/api/applications/${id}/set-status`, payload);
 
 export const VerifyOtp = (id: number, payload: any) =>
-  clientApi.post(`/api/applications/${id}/verify-otp`, payload);
+  clientApi.post(`/api/applications/${id}/verify-otp/`, payload);
