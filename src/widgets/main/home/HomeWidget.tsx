@@ -98,6 +98,9 @@ const MOCK_CREDITORS = [{ id: 1, name: "ТОО 'Робокэш.кз'" }];
 // Моковые данные для шаблонов
 const MOCK_TEMPLATES = [
   { id: 1, name: "Реструктуризация долга", type: "restructuring" },
+  { id: 2, name: "Отсрочка платежа", type: "payment_deferral" },
+  { id: 3, name: "Частичное списание долга", type: "partial_writeoff" },
+  { id: 4, name: "Изменение графика выплат", type: "schedule_change" },
 ];
 
 // Функция для форматирования даты
