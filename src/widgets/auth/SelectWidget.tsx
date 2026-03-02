@@ -27,7 +27,7 @@ export function SelectWidget() {
     {
       name: "МФО",
       desc: "From advanced task tracking to complete project management tools",
-      link: "/admin",
+      link: "/auth/register/creditor?mfo",
     },
   ];
 

@@ -1,4 +1,4 @@
-import { clientApi } from "@/shared/services/client";
+import { clientApi, formDataApi } from "@/shared/services/client";
 import type { QueryParams } from "../types/payload";
 
 
@@ -39,3 +39,29 @@ export const SetStatus = (id: number, payload: any) =>
 
 export const VerifyOtp = (id: number, payload: any) =>
   clientApi.post(`/api/applications/${id}/verify-otp/`, payload);
+
+export const GetCreditor = (type?: string) =>
+  clientApi.get(`/api/creditors/`, {
+    params: type ? { type } : undefined,
+  });
+  
+export const PreviewDocument = async (payload: any) => {
+  try {
+    const response = await clientApi.post('/api/document-preview', payload, {
+      responseType: 'blob', // Просто получаем как blob
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+      return response.data; 
+       
+  } catch (error) {
+    console.error("Ошибка в PreviewDocument:", error);
+    throw error;
+  }
+};
+
+export const CreateFileApplication = (payload: any, id: number) => {
+  return formDataApi.post(`/api/applications/${id}/upload-contract/`, payload);
+}

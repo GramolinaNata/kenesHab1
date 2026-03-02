@@ -22,6 +22,7 @@ import {
   HomeOmbudsman,
   ShowAppealsOmbudsman,
   Profile,
+  RegisterCreditor,
 } from "../lib/route";
 
 import { ProtectedRoute, AuthRoute } from "../components/ProtectedRoute";
@@ -37,6 +38,7 @@ export const routes: RouteObject[] = [
         children: [
           { path: "login", element: <Login /> },
           { path: "register/client", element: <RegisterClient /> },
+          { path: "register/creditor", element: <RegisterCreditor /> },
           { path: "select", element: <Select /> },
         ],
       },

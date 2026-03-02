@@ -1,4 +1,3 @@
-
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { makeApiWithHandler } from "./api";
 import { tokenStore } from "../lib/tokenStore";
@@ -110,3 +109,72 @@ apiClient.interceptors.response.use(
 // Методы API
 export const clientApi = makeApiWithHandler(apiClient);
 
+// Создаем formDataClient с теми же настройками
+const formDataClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'multipart/form-data',
+  },
+  withCredentials: true, // Добавляем для поддержки cookies
+});
+
+// Добавляем интерцептор запроса для formDataClient
+formDataClient.interceptors.request.use(
+  (config) => {
+    const tokens = tokenStore.get();
+    if (tokens.access) {
+      config.headers.Authorization = `Bearer ${tokens.access}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Добавляем интерцептор ответа для formDataClient (для обработки 401)
+formDataClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as CustomAxiosConfig;
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (currentPath.startsWith("/auth")) return Promise.reject(error);
+
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return formDataClient(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const newToken = await refreshAccessToken();
+        processQueue(null, newToken);
+        isRefreshing = false;
+        
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return formDataClient(originalRequest);
+      } catch (err) {
+        processQueue(err, null);
+        isRefreshing = false;
+        tokenStore.clear();
+        
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("redirectPath", currentPath);
+          window.location.href = "/auth/login";
+        }
+        return Promise.reject(err);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const formDataApi = makeApiWithHandler(formDataClient);

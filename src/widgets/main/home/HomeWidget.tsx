@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useApplicationCreate,
   useApplicationDelete,
@@ -9,6 +9,8 @@ import {
   useApplicationSendEmail,
   useApplicationSendOtp,
   useApplicationVerifyOtp,
+  useCreditors,
+  useDocumentPreview,
 } from "@/features/application/hooks/useApplication";
 import { AppealCard } from "@/shared/components/block/AppealCard";
 import ComplaintCard from "@/shared/components/block/ComplaintCard";
@@ -27,6 +29,8 @@ import {
   Loader2,
   ShieldCheck,
   Copy,
+  Eye,
+  FileDown,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -165,318 +169,84 @@ const STATUS_OPTIONS = [
   { value: "COMPLETED", label: "Завершена" },
 ];
 
-export default function HomeWidget() {
-  const { data: applicationsData, isLoading } = useApplications();
-  const createApplication = useApplicationCreate();
-  const updateApplication = useApplicationUpdate();
-  const deleteApplication = useApplicationDelete();
-  const setApplicationStatus = useApplicationSetStatus();
-  const generateDocument = useApplicationGenerateDocument();
-  const sendEmail = useApplicationSendEmail();
-  const sendOtp = useApplicationSendOtp();
-  const verifyOtp = useApplicationVerifyOtp();
+// Компонент для выбора статуса
+const StatusDropdown = ({
+  currentStatus,
+  applicationId,
+  onStatusChange,
+  isPending,
+}: {
+  currentStatus: string;
+  applicationId: number;
+  onStatusChange: (id: number, status: string) => void;
+  isPending: boolean;
+}) => {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <div className="cursor-pointer">
+          <StatusBadge status={currentStatus} />
+        </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {STATUS_OPTIONS.map((status) => (
+          <DropdownMenuItem
+            key={status.value}
+            onClick={() => onStatusChange(applicationId, status.value)}
+            disabled={status.value === currentStatus || isPending}
+            className="flex items-center gap-2"
+          >
+            {status.value === currentStatus && (
+              <CheckCircle className="h-4 w-4" />
+            )}
+            {status.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
 
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
-  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-  const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
-  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState<any>(null);
-  const [, setApplicationType] = useState<string>("");
-  const [statusChangeData, setStatusChangeData] = useState<{
-    id: number;
-    currentStatus: string;
-    newStatus: string;
-  } | null>(null);
-  const [otpCode, setOtpCode] = useState<string>("");
-  const [isOtpSent, setIsOtpSent] = useState<boolean>(false);
-  const [emailProcessStep, setEmailProcessStep] = useState<
-    | "generating_document"
-    | "sending_otp"
-    | "verifying_otp"
-    | "sending_email"
-    | "completed"
-  >("generating_document");
+// Компонент CreateApplicationDialog
+const CreateApplicationDialog = ({
+  isOpen,
+  onClose,
+  selectedType,
+  setSelectedType,
+  creditors,
+  isLoadingCreditors,
+  createForm,
+  documentPreview,
+  onGeneratePDF,
+  createApplication,
+  onSubmit,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedType: "bank" | "mfo" | null;
+  setSelectedType: (type: "bank" | "mfo" | null) => void;
+  creditors: any[];
+  isLoadingCreditors: boolean;
+  createForm: any;
+  documentPreview: any;
+  onGeneratePDF: (data: any) => void;
+  createApplication: any;
+  onSubmit: (data: any) => void;
+}) => {
+  const watchedCreditor = createForm.watch("creditor");
+  const watchedAmount = createForm.watch("amount");
+  const watchedTemplate = createForm.watch("template");
+  const watchedBankEmail = createForm.watch("bank_email");
 
-  const createForm = useForm<ApplicationFormValues>({
-    resolver: zodResolver(applicationFormSchema),
-    defaultValues: {
-      creditor: undefined,
-      amount: 0,
-      comment: "",
-      template: undefined,
-      bank_email: "",
-    },
-  });
+  const isFormValid =
+    !!watchedCreditor &&
+    watchedAmount > 0 &&
+    !!watchedTemplate &&
+    !!watchedBankEmail &&
+    !!selectedType;
 
-  const editForm = useForm<ApplicationFormValues>({
-    resolver: zodResolver(applicationFormSchema),
-    defaultValues: {
-      creditor: undefined,
-      amount: 0,
-      comment: "",
-      template: undefined,
-      bank_email: "",
-    },
-  });
-
-  const otpForm = useForm<OtpFormValues>({
-    resolver: zodResolver(otpFormSchema),
-    defaultValues: {
-      code: "",
-    },
-  });
-
-  const handleCardClick = (type: string) => {
-    setApplicationType(type);
-    let templateId: number | undefined;
-    if (type === "statement") templateId = 1;
-    if (type === "lawyer") templateId = 2;
-    if (type === "mediator") templateId = 3;
-    if (type === "ombudsman") templateId = 4;
-
-    if (templateId) {
-      createForm.setValue("template", templateId);
-    }
-    setIsCreateDialogOpen(true);
-  };
-
-  const handleEdit = (application: any) => {
-    setSelectedApplication(application);
-    editForm.reset({
-      creditor: application.creditor,
-      amount: parseFloat(application.amount),
-      comment: "",
-      template: 1,
-      bank_email: "",
-    });
-    setIsEditDialogOpen(true);
-  };
-
-  const handleDelete = (application: any) => {
-    setSelectedApplication(application);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (selectedApplication) {
-      try {
-        await deleteApplication.mutateAsync(selectedApplication.id);
-        setIsDeleteDialogOpen(false);
-        setSelectedApplication(null);
-      } catch (error) {
-        console.error("Ошибка при удалении заявки:", error);
-      }
-    }
-  };
-
-  const handleGenerateDocument = async (applicationId: number) => {
-    try {
-      const result = await generateDocument.mutateAsync(applicationId);
-      console.log("Документ сгенерирован:", result);
-      setIsDocumentDialogOpen(false);
-    } catch (error) {
-      console.error("Ошибка при генерации документа:", error);
-    }
-  };
-
-  const startEmailProcess = async (applicationId: number) => {
-    try {
-      setEmailProcessStep("generating_document");
-
-      // Сначала генерируем документ
-      const documentResult = await generateDocument.mutateAsync(applicationId);
-      console.log("Документ сгенерирован для отправки:", documentResult);
-
-      // Затем отправляем OTP
-      setEmailProcessStep("sending_otp");
-      const otpResult = await sendOtp.mutateAsync(applicationId);
-      console.log("OTP отправлен:", otpResult);
-
-      // Получаем код из ответа (предполагаем, что код в response.data.code)
-      const code = otpResult?.code || otpResult?.dev_code || "123456"; // Пример кода
-      setOtpCode(code);
-      setIsOtpSent(true);
-      setEmailProcessStep("verifying_otp");
-
-      // Закрываем email диалог и открываем OTP диалог
-      setIsEmailDialogOpen(false);
-      setIsOtpDialogOpen(true);
-    } catch (error) {
-      console.error("Ошибка в процессе отправки email:", error);
-      setEmailProcessStep("generating_document");
-    }
-  };
-
-  const handleVerifyOtp = async (applicationId: number, code: string) => {
-    try {
-      setEmailProcessStep("verifying_otp");
-
-      // Верифицируем OTP с кодом
-      const verifyResult = await verifyOtp.mutateAsync({
-        id: applicationId,
-        payload: { code },
-      });
-      console.log("OTP верифицирован:", verifyResult);
-
-      // После успешной верификации отправляем email
-      setEmailProcessStep("sending_email");
-      const emailResult = await sendEmail.mutateAsync(applicationId);
-      console.log("Email отправлен:", emailResult);
-
-      setEmailProcessStep("completed");
-
-      // Закрываем диалог и сбрасываем состояние
-      setTimeout(() => {
-        setIsOtpDialogOpen(false);
-        setSelectedApplication(null);
-        setOtpCode("");
-        setIsOtpSent(false);
-        otpForm.reset({ code: "" });
-        setEmailProcessStep("generating_document");
-      }, 1500);
-    } catch (error) {
-      console.error("Ошибка при верификации OTP:", error);
-    }
-  };
-
-  const handleStatusChange = async (
-    applicationId: number,
-    newStatus: string,
-  ) => {
-    setStatusChangeData({
-      id: applicationId,
-      currentStatus:
-        applicationsData?.results.find((app: any) => app.id === applicationId)
-          ?.status || "",
-      newStatus,
-    });
-    setIsStatusDialogOpen(true);
-  };
-
-  const confirmStatusChange = async () => {
-    if (statusChangeData) {
-      try {
-        await setApplicationStatus.mutateAsync({
-          id: statusChangeData.id,
-          payload: { status: statusChangeData.newStatus },
-        });
-        setIsStatusDialogOpen(false);
-        setStatusChangeData(null);
-      } catch (error) {
-        console.error("Ошибка при изменении статуса:", error);
-      }
-    }
-  };
-
-  const onCreateSubmit = async (data: ApplicationFormValues) => {
-    try {
-      console.log("Отправляемые данные:", data);
-      await createApplication.mutateAsync({
-        creditor: data.creditor,
-        amount: data.amount,
-        comment: data.comment,
-        template: data.template,
-        bank_email: data.bank_email,
-      });
-      setIsCreateDialogOpen(false);
-      createForm.reset({
-        creditor: undefined,
-        amount: 0,
-        comment: "",
-        template: undefined,
-        bank_email: "",
-      });
-    } catch (error) {
-      console.error("Ошибка при создании заявки:", error);
-    }
-  };
-
-  const onEditSubmit = async (data: ApplicationFormValues) => {
-    if (!selectedApplication) return;
-
-    try {
-      await updateApplication.mutateAsync({
-        id: selectedApplication.id,
-        payload: {
-          creditor: data.creditor,
-          amount: data.amount,
-          comment: data.comment,
-          template: data.template,
-          bank_email: data.bank_email,
-        },
-      });
-      setIsEditDialogOpen(false);
-      setSelectedApplication(null);
-    } catch (error) {
-      console.error("Ошибка при обновлении заявки:", error);
-    }
-  };
-
-  const onOtpSubmit = async (data: OtpFormValues) => {
-    if (!selectedApplication) return;
-
-    try {
-      await handleVerifyOtp(selectedApplication.id, data.code);
-    } catch (error) {
-      console.error("Ошибка при верификации OTP:", error);
-    }
-  };
-
-  // Функция для копирования OTP кода в буфер обмена
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        // Можно добавить уведомление об успешном копировании
-        console.log("Код скопирован в буфер обмена");
-      })
-      .catch((err) => {
-        console.error("Ошибка при копировании: ", err);
-      });
-  };
-
-  // Компонент для выбора статуса
-  const StatusDropdown = ({
-    currentStatus,
-    applicationId,
-  }: {
-    currentStatus: string;
-    applicationId: number;
-  }) => {
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <div className="cursor-pointer">
-            <StatusBadge status={currentStatus} />
-          </div>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {STATUS_OPTIONS.map((status) => (
-            <DropdownMenuItem
-              key={status.value}
-              onClick={() => handleStatusChange(applicationId, status.value)}
-              disabled={
-                status.value === currentStatus || setApplicationStatus.isPending
-              }
-              className="flex items-center gap-2"
-            >
-              {status.value === currentStatus && (
-                <CheckCircle className="h-4 w-4" />
-              )}
-              {status.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  };
-
-  // Диалоговое окно для создания заявки
-  const CreateApplicationDialog = () => (
-    <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">
@@ -485,9 +255,38 @@ export default function HomeWidget() {
         </DialogHeader>
         <Form {...createForm}>
           <form
-            onSubmit={createForm.handleSubmit(onCreateSubmit)}
+            onSubmit={createForm.handleSubmit(onSubmit)}
             className="space-y-4"
           >
+            {/* Поле выбора типа организации */}
+            <div className="space-y-2">
+              <FormLabel>Тип организации *</FormLabel>
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant={selectedType === "bank" ? "default" : "outline"}
+                  className={selectedType === "bank" ? "bg-[#1f74ec]" : ""}
+                  onClick={() => {
+                    setSelectedType("bank");
+                    createForm.setValue("creditor", undefined);
+                  }}
+                >
+                  Банк
+                </Button>
+                <Button
+                  type="button"
+                  variant={selectedType === "mfo" ? "default" : "outline"}
+                  className={selectedType === "mfo" ? "bg-[#1f74ec]" : ""}
+                  onClick={() => {
+                    setSelectedType("mfo");
+                    createForm.setValue("creditor", undefined);
+                  }}
+                >
+                  МФО
+                </Button>
+              </div>
+            </div>
+
             <FormField
               control={createForm.control}
               name="creditor"
@@ -497,21 +296,50 @@ export default function HomeWidget() {
                   <Select
                     onValueChange={(value) => field.onChange(parseInt(value))}
                     value={field.value?.toString()}
+                    disabled={isLoadingCreditors || !selectedType}
                   >
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Выберите кредитора" />
+                        <SelectValue
+                          placeholder={
+                            !selectedType
+                              ? "Сначала выберите тип организации"
+                              : isLoadingCreditors
+                                ? "Загрузка кредиторов..."
+                                : "Выберите кредитора"
+                          }
+                        />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {MOCK_CREDITORS.map((creditor) => (
-                        <SelectItem
-                          key={creditor.id}
-                          value={creditor.id.toString()}
-                        >
-                          {creditor.name}
+                      {!selectedType ? (
+                        <SelectItem value="no-type" disabled>
+                          Выберите тип организации
                         </SelectItem>
-                      ))}
+                      ) : isLoadingCreditors ? (
+                        <SelectItem value="loading" disabled>
+                          Загрузка...
+                        </SelectItem>
+                      ) : creditors && creditors.length > 0 ? (
+                        creditors.map((creditor) => (
+                          <SelectItem
+                            key={creditor.id}
+                            value={creditor.id.toString()}
+                          >
+                            <div className="flex flex-col">
+                              <span>{creditor.name}</span>
+                              <span className="text-xs text-gray-500">
+                                {creditor.type === "bank" ? "Банк" : "МФО"} •{" "}
+                                {creditor.email}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-data" disabled>
+                          Нет доступных кредиторов для выбранного типа
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -616,40 +444,94 @@ export default function HomeWidget() {
               <p>* Поля обязательные для заполнения</p>
             </div>
 
-            <div className="flex justify-end space-x-2 pt-4">
+            <div className="flex flex-col gap-3 pt-4">
+              {/* Кнопка генерации PDF */}
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  setIsCreateDialogOpen(false);
-                  createForm.reset({
-                    creditor: undefined,
-                    amount: 0,
-                    comment: "",
-                    template: undefined,
-                    bank_email: "",
-                  });
+                  const formData = createForm.getValues();
+                  onGeneratePDF(formData);
                 }}
+                disabled={documentPreview?.isPending || !isFormValid}
+                className={`w-full border-2 ${
+                  isFormValid
+                    ? "border-blue-600 text-blue-600 hover:bg-blue-50"
+                    : "border-gray-300 text-gray-400 cursor-not-allowed"
+                }`}
               >
-                Отмена
+                {documentPreview?.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Генерация PDF...
+                  </>
+                ) : (
+                  <>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Предпросмотр PDF
+                  </>
+                )}
               </Button>
-              <Button
-                type="submit"
-                disabled={createApplication.isPending}
-                className="bg-[#1f74ec] hover:bg-[#1a65d4]"
-              >
-                {createApplication.isPending ? "Отправка..." : "Создать заявку"}
-              </Button>
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    onClose();
+                    setSelectedType(null);
+                    createForm.reset({
+                      creditor: undefined,
+                      amount: 0,
+                      comment: "",
+                      template: undefined,
+                      bank_email: "",
+                    });
+                  }}
+                >
+                  Отмена
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    createApplication?.isPending ||
+                    isLoadingCreditors ||
+                    !selectedType ||
+                    !isFormValid
+                  }
+                  className="bg-[#1f74ec] hover:bg-[#1a65d4]"
+                >
+                  {createApplication?.isPending
+                    ? "Отправка..."
+                    : "Создать заявку"}
+                </Button>
+              </div>
             </div>
           </form>
         </Form>
       </DialogContent>
     </Dialog>
   );
+};
 
-  // Диалоговое окно для редактирования заявки
-  const EditApplicationDialog = () => (
-    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+// Компонент EditApplicationDialog
+const EditApplicationDialog = ({
+  isOpen,
+  onClose,
+  selectedApplication,
+  editForm,
+  updateApplication,
+  onSubmit,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedApplication: any;
+  editForm: any;
+  updateApplication: any;
+  onSubmit: (data: any) => void;
+}) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">
@@ -661,7 +543,7 @@ export default function HomeWidget() {
         </DialogHeader>
         <Form {...editForm}>
           <form
-            onSubmit={editForm.handleSubmit(onEditSubmit)}
+            onSubmit={editForm.handleSubmit(onSubmit)}
             className="space-y-4"
           >
             <FormField
@@ -789,22 +671,15 @@ export default function HomeWidget() {
             />
 
             <div className="flex justify-end space-x-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsEditDialogOpen(false);
-                  setSelectedApplication(null);
-                }}
-              >
+              <Button type="button" variant="outline" onClick={onClose}>
                 Отмена
               </Button>
               <Button
                 type="submit"
-                disabled={updateApplication.isPending}
+                disabled={updateApplication?.isPending}
                 className="bg-[#1f74ec] hover:bg-[#1a65d4]"
               >
-                {updateApplication.isPending
+                {updateApplication?.isPending
                   ? "Сохранение..."
                   : "Сохранить изменения"}
               </Button>
@@ -814,10 +689,24 @@ export default function HomeWidget() {
       </DialogContent>
     </Dialog>
   );
+};
 
-  // Диалоговое окно подтверждения удаления
-  const DeleteConfirmationDialog = () => (
-    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+// Компонент DeleteConfirmationDialog
+const DeleteConfirmationDialog = ({
+  isOpen,
+  onClose,
+  selectedApplication,
+  deleteApplication,
+  onConfirm,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedApplication: any;
+  deleteApplication: any;
+  onConfirm: () => void;
+}) => {
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
@@ -828,32 +717,36 @@ export default function HomeWidget() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel
-            onClick={() => {
-              setIsDeleteDialogOpen(false);
-              setSelectedApplication(null);
-            }}
-          >
-            Отмена
-          </AlertDialogCancel>
+          <AlertDialogCancel onClick={onClose}>Отмена</AlertDialogCancel>
           <AlertDialogAction
-            onClick={confirmDelete}
+            onClick={onConfirm}
             className="bg-red-600 hover:bg-red-700"
-            disabled={deleteApplication.isPending}
+            disabled={deleteApplication?.isPending}
           >
-            {deleteApplication.isPending ? "Удаление..." : "Удалить"}
+            {deleteApplication?.isPending ? "Удаление..." : "Удалить"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
+};
 
-  // Диалоговое окно генерации документа
-  const GenerateDocumentDialog = () => (
-    <AlertDialog
-      open={isDocumentDialogOpen}
-      onOpenChange={setIsDocumentDialogOpen}
-    >
+// Компонент GenerateDocumentDialog
+const GenerateDocumentDialog = ({
+  isOpen,
+  onClose,
+  selectedApplication,
+  generateDocument,
+  onGenerate,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedApplication: any;
+  generateDocument: any;
+  onGenerate: (id: number) => void;
+}) => {
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Сгенерировать документ?</AlertDialogTitle>
@@ -864,20 +757,13 @@ export default function HomeWidget() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel
-            onClick={() => {
-              setIsDocumentDialogOpen(false);
-              setSelectedApplication(null);
-            }}
-          >
-            Отмена
-          </AlertDialogCancel>
+          <AlertDialogCancel onClick={onClose}>Отмена</AlertDialogCancel>
           <AlertDialogAction
-            onClick={() => handleGenerateDocument(selectedApplication.id)}
+            onClick={() => onGenerate(selectedApplication?.id)}
             className="bg-green-600 hover:bg-green-700"
-            disabled={generateDocument.isPending}
+            disabled={generateDocument?.isPending}
           >
-            {generateDocument.isPending ? (
+            {generateDocument?.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Генерация...
@@ -893,10 +779,28 @@ export default function HomeWidget() {
       </AlertDialogContent>
     </AlertDialog>
   );
+};
 
-  // Диалоговое окно отправки email
-  const SendEmailDialog = () => (
-    <AlertDialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+// Компонент SendEmailDialog
+const SendEmailDialog = ({
+  isOpen,
+  onClose,
+  selectedApplication,
+  generateDocument,
+  sendOtp,
+  emailProcessStep,
+  onStart,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedApplication: any;
+  generateDocument: any;
+  sendOtp: any;
+  emailProcessStep: string;
+  onStart: (id: number) => void;
+}) => {
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Отправить документ на email?</AlertDialogTitle>
@@ -911,20 +815,13 @@ export default function HomeWidget() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel
-            onClick={() => {
-              setIsEmailDialogOpen(false);
-              setSelectedApplication(null);
-            }}
-          >
-            Отмена
-          </AlertDialogCancel>
+          <AlertDialogCancel onClick={onClose}>Отмена</AlertDialogCancel>
           <AlertDialogAction
-            onClick={() => startEmailProcess(selectedApplication.id)}
+            onClick={() => onStart(selectedApplication?.id)}
             className="bg-blue-600 hover:bg-blue-700"
-            disabled={generateDocument.isPending || sendOtp.isPending}
+            disabled={generateDocument?.isPending || sendOtp?.isPending}
           >
-            {generateDocument.isPending || sendOtp.isPending ? (
+            {generateDocument?.isPending || sendOtp?.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 {emailProcessStep === "generating_document"
@@ -942,10 +839,36 @@ export default function HomeWidget() {
       </AlertDialogContent>
     </AlertDialog>
   );
+};
 
-  // Диалоговое окно OTP верификации
-  const OtpDialog = () => (
-    <Dialog open={isOtpDialogOpen} onOpenChange={setIsOtpDialogOpen}>
+// Компонент OtpDialog
+const OtpDialog = ({
+  isOpen,
+  onClose,
+  selectedApplication,
+  otpCode,
+  isOtpSent,
+  emailProcessStep,
+  otpForm,
+  verifyOtp,
+  sendEmail,
+  copyToClipboard,
+  onSubmit,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedApplication: any;
+  otpCode: string;
+  isOtpSent: boolean;
+  emailProcessStep: string;
+  otpForm: any;
+  verifyOtp: any;
+  sendEmail: any;
+  copyToClipboard: (text: string) => void;
+  onSubmit: (data: any) => void;
+}) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold flex items-center gap-2">
@@ -1008,7 +931,7 @@ export default function HomeWidget() {
           {/* Форма для ввода OTP кода */}
           <Form {...otpForm}>
             <form
-              onSubmit={otpForm.handleSubmit(onOtpSubmit)}
+              onSubmit={otpForm.handleSubmit(onSubmit)}
               className="space-y-4"
             >
               <FormField
@@ -1021,7 +944,7 @@ export default function HomeWidget() {
                       <Input
                         placeholder="Введите код подтверждения"
                         className="text-center text-lg tracking-widest"
-                        disabled={verifyOtp.isPending || sendEmail.isPending}
+                        disabled={verifyOtp?.isPending || sendEmail?.isPending}
                         {...field}
                       />
                     </FormControl>
@@ -1043,28 +966,24 @@ export default function HomeWidget() {
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    setIsOtpDialogOpen(false);
-                    setSelectedApplication(null);
-                    setOtpCode("");
-                    setIsOtpSent(false);
+                    onClose();
                     otpForm.reset({ code: "" });
-                    setEmailProcessStep("generating_document");
                   }}
-                  disabled={verifyOtp.isPending || sendEmail.isPending}
+                  disabled={verifyOtp?.isPending || sendEmail?.isPending}
                 >
                   Отмена
                 </Button>
                 <Button
                   type="submit"
-                  disabled={verifyOtp.isPending || sendEmail.isPending}
+                  disabled={verifyOtp?.isPending || sendEmail?.isPending}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {verifyOtp.isPending ? (
+                  {verifyOtp?.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Проверка...
                     </>
-                  ) : sendEmail.isPending ? (
+                  ) : sendEmail?.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Отправка...
@@ -1083,10 +1002,24 @@ export default function HomeWidget() {
       </DialogContent>
     </Dialog>
   );
+};
 
-  // Диалоговое окно изменения статуса
-  const StatusChangeDialog = () => (
-    <AlertDialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+// Компонент StatusChangeDialog
+const StatusChangeDialog = ({
+  isOpen,
+  onClose,
+  statusChangeData,
+  setApplicationStatus,
+  onConfirm,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  statusChangeData: any;
+  setApplicationStatus: any;
+  onConfirm: () => void;
+}) => {
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Изменить статус заявки?</AlertDialogTitle>
@@ -1107,35 +1040,566 @@ export default function HomeWidget() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel
-            onClick={() => {
-              setIsStatusDialogOpen(false);
-              setStatusChangeData(null);
-            }}
-          >
-            Отмена
-          </AlertDialogCancel>
+          <AlertDialogCancel onClick={onClose}>Отмена</AlertDialogCancel>
           <AlertDialogAction
-            onClick={confirmStatusChange}
+            onClick={onConfirm}
             className="bg-[#1f74ec] hover:bg-[#1a65d4]"
-            disabled={setApplicationStatus.isPending}
+            disabled={setApplicationStatus?.isPending}
           >
-            {setApplicationStatus.isPending ? "Изменение..." : "Изменить"}
+            {setApplicationStatus?.isPending ? "Изменение..." : "Изменить"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
+};
+
+const PDFPreview = ({
+  pdfBlob,
+  fileName,
+}: {
+  pdfBlob: Blob | null;
+  fileName: string;
+}) => {
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Управляем открытием/закрытием на основе pdfBlob
+  useEffect(() => {
+    if (pdfBlob) {
+      setIsOpen(true);
+      setIsLoading(true);
+
+      // Создаем URL из Blob
+      const url = URL.createObjectURL(pdfBlob);
+      setPdfUrl(url);
+      setIsLoading(false);
+
+      // Очищаем URL при размонтировании или изменении pdfBlob
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    } else {
+      setIsOpen(false);
+      setPdfUrl(null);
+    }
+  }, [pdfBlob]);
+
+  const handleClose = () => {
+    setIsOpen(false);
+  };
+
+  const handleDownload = () => {
+    if (pdfBlob && pdfUrl) {
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = fileName || "document.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handlePrint = () => {
+    if (pdfUrl) {
+      const printWindow = window.open(pdfUrl);
+      printWindow?.print();
+    }
+  };
+
+  // Не рендерим ничего, если нет blob или url
+  if (!pdfBlob || !pdfUrl) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent
+        className="sm:max-w-[900px] w-[95vw] max-h-[95vh] p-4 sm:p-6"
+        // Предотвращаем всплытие событий, которые могут закрыть другие модалки
+        onPointerDownOutside={(e) => {
+          e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          e.preventDefault();
+          handleClose();
+        }}
+      >
+        <DialogHeader className="space-y-1.5 sm:space-y-2">
+          <DialogTitle className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
+            <span className="truncate">Предпросмотр документа</span>
+          </DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
+            Сгенерированный PDF документ для заявки
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-3 sm:gap-4 mt-2 sm:mt-4">
+          {/* Адаптивная панель инструментов */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4">
+            <div className="text-xs sm:text-sm text-gray-500 truncate max-w-full px-1">
+              {fileName}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrint}
+                className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-initial px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
+              >
+                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span>Печать</span>
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleDownload}
+                className="flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-initial px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
+              >
+                <FileDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span>Скачать PDF</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Адаптивный предпросмотр PDF */}
+          <div className="relative w-full h-[50vh] sm:h-[600px] bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+            {isLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-blue-600" />
+              </div>
+            ) : (
+              <iframe
+                src={pdfUrl}
+                className="w-full h-full"
+                title="PDF Preview"
+                style={{ minHeight: "300px" }}
+              />
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+export default function HomeWidget() {
+  const { data: applicationsData, isLoading } = useApplications();
+  const createApplication = useApplicationCreate();
+  const updateApplication = useApplicationUpdate();
+  const deleteApplication = useApplicationDelete();
+  const setApplicationStatus = useApplicationSetStatus();
+  const generateDocument = useApplicationGenerateDocument();
+  const sendEmail = useApplicationSendEmail();
+  const sendOtp = useApplicationSendOtp();
+  const verifyOtp = useApplicationVerifyOtp();
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [pdfFileName, setPdfFileName] = useState<string>("document.pdf");
+  const [, setIsPdfLoading] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+
+  const [selectedApplication, setSelectedApplication] = useState<any>(null);
+  const [, setApplicationType] = useState<string>("");
+  const [statusChangeData, setStatusChangeData] = useState<{
+    id: number;
+    currentStatus: string;
+    newStatus: string;
+  } | null>(null);
+  const [otpCode, setOtpCode] = useState<string>("");
+  const [isOtpSent, setIsOtpSent] = useState<boolean>(false);
+  const [emailProcessStep, setEmailProcessStep] = useState<
+    | "generating_document"
+    | "sending_otp"
+    | "verifying_otp"
+    | "sending_email"
+    | "completed"
+  >("generating_document");
+  const [selectedType, setSelectedType] = useState<"bank" | "mfo" | null>(null);
+
+  const { data: creditors, isLoading: isLoadingCreditors } = useCreditors(
+    selectedType || undefined,
+  );
+
+  const documentPreview = useDocumentPreview();
+
+  const createForm = useForm<ApplicationFormValues>({
+    resolver: zodResolver(applicationFormSchema),
+    defaultValues: {
+      creditor: undefined,
+      amount: 0,
+      comment: "",
+      template: undefined,
+      bank_email: "",
+    },
+  });
+
+  const editForm = useForm<ApplicationFormValues>({
+    resolver: zodResolver(applicationFormSchema),
+    defaultValues: {
+      creditor: undefined,
+      amount: 0,
+      comment: "",
+      template: undefined,
+      bank_email: "",
+    },
+  });
+
+  const otpForm = useForm<OtpFormValues>({
+    resolver: zodResolver(otpFormSchema),
+    defaultValues: {
+      code: "",
+    },
+  });
+
+  const handleCardClick = (type: string) => {
+    setApplicationType(type);
+    let templateId: number | undefined;
+    if (type === "statement") templateId = 1;
+    if (type === "lawyer") templateId = 2;
+    if (type === "mediator") templateId = 3;
+    if (type === "ombudsman") templateId = 4;
+
+    if (templateId) {
+      createForm.setValue("template", templateId);
+    }
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleGeneratePDF = async (data: ApplicationFormValues) => {
+    try {
+      setIsPdfLoading(true);
+
+      // Получаем название кредитора
+      const creditor = creditors?.find((c: any) => c.id === data.creditor);
+      const creditorName = creditor?.name || "creditor";
+
+      // Получаем название шаблона
+      const template = MOCK_TEMPLATES.find((t) => t.id === data.template);
+      const templateName = template?.name || "document";
+
+      // Формируем имя файла
+      const date = new Date().toISOString().split("T")[0];
+      const fileName = `${templateName}_${creditorName}_${date}.pdf`
+        .replace(/[^a-zA-Zа-яА-Я0-9\s_-]/g, "") // Удаляем спецсимволы
+        .replace(/\s+/g, "_"); // Заменяем пробелы на подчеркивания
+
+      const blob = await documentPreview.mutateAsync({
+        creditor: data.creditor,
+        amount: data.amount,
+        comment: data.comment,
+        template: data.template,
+        bank_email: data.bank_email,
+      });
+
+      setPdfBlob(blob);
+      setPdfFileName(fileName);
+    } catch (error) {
+      console.error("Ошибка при генерации PDF:", error);
+      // Здесь можно показать уведомление об ошибке
+      alert("Ошибка при генерации PDF. Пожалуйста, попробуйте снова.");
+    } finally {
+      setIsPdfLoading(false);
+    }
+  };
+
+  const handleEdit = (application: any) => {
+    setSelectedApplication(application);
+    editForm.reset({
+      creditor: application.creditor,
+      amount: parseFloat(application.amount),
+      comment: "",
+      template: 1,
+      bank_email: "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDelete = (application: any) => {
+    setSelectedApplication(application);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (selectedApplication) {
+      try {
+        await deleteApplication.mutateAsync(selectedApplication.id);
+        setIsDeleteDialogOpen(false);
+        setSelectedApplication(null);
+      } catch (error) {
+        console.error("Ошибка при удалении заявки:", error);
+      }
+    }
+  };
+
+  const handleGenerateDocument = async (applicationId: number) => {
+    try {
+      const result = await generateDocument.mutateAsync(applicationId);
+      console.log("Документ сгенерирован:", result);
+      setIsDocumentDialogOpen(false);
+    } catch (error) {
+      console.error("Ошибка при генерации документа:", error);
+    }
+  };
+
+  const startEmailProcess = async (applicationId: number) => {
+    try {
+      setEmailProcessStep("generating_document");
+
+      const documentResult = await generateDocument.mutateAsync(applicationId);
+      console.log("Документ сгенерирован для отправки:", documentResult);
+
+      setEmailProcessStep("sending_otp");
+      const otpResult = await sendOtp.mutateAsync(applicationId);
+      console.log("OTP отправлен:", otpResult);
+
+      const code = otpResult?.code || otpResult?.dev_code || "123456";
+      setOtpCode(code);
+      setIsOtpSent(true);
+      setEmailProcessStep("verifying_otp");
+
+      setIsEmailDialogOpen(false);
+      setIsOtpDialogOpen(true);
+    } catch (error) {
+      console.error("Ошибка в процессе отправки email:", error);
+      setEmailProcessStep("generating_document");
+    }
+  };
+
+  const handleVerifyOtp = async (applicationId: number, code: string) => {
+    try {
+      setEmailProcessStep("verifying_otp");
+
+      const verifyResult = await verifyOtp.mutateAsync({
+        id: applicationId,
+        payload: { code },
+      });
+      console.log("OTP верифицирован:", verifyResult);
+
+      setEmailProcessStep("sending_email");
+      const emailResult = await sendEmail.mutateAsync(applicationId);
+      console.log("Email отправлен:", emailResult);
+
+      setEmailProcessStep("completed");
+
+      setTimeout(() => {
+        setIsOtpDialogOpen(false);
+        setSelectedApplication(null);
+        setOtpCode("");
+        setIsOtpSent(false);
+        otpForm.reset({ code: "" });
+        setEmailProcessStep("generating_document");
+      }, 1500);
+    } catch (error) {
+      console.error("Ошибка при верификации OTP:", error);
+    }
+  };
+
+  const handleStatusChange = async (
+    applicationId: number,
+    newStatus: string,
+  ) => {
+    setStatusChangeData({
+      id: applicationId,
+      currentStatus:
+        applicationsData?.results.find((app: any) => app.id === applicationId)
+          ?.status || "",
+      newStatus,
+    });
+    setIsStatusDialogOpen(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (statusChangeData) {
+      try {
+        await setApplicationStatus.mutateAsync({
+          id: statusChangeData.id,
+          payload: { status: statusChangeData.newStatus },
+        });
+        setIsStatusDialogOpen(false);
+        setStatusChangeData(null);
+      } catch (error) {
+        console.error("Ошибка при изменении статуса:", error);
+      }
+    }
+  };
+
+  const onCreateSubmit = async (data: ApplicationFormValues) => {
+    try {
+      console.log("Отправляемые данные:", data);
+      await createApplication.mutateAsync({
+        creditor: data.creditor,
+        amount: data.amount,
+        comment: data.comment,
+        template: data.template,
+        bank_email: data.bank_email,
+      });
+      setIsCreateDialogOpen(false);
+      createForm.reset({
+        creditor: undefined,
+        amount: 0,
+        comment: "",
+        template: undefined,
+        bank_email: "",
+      });
+      setSelectedType(null);
+    } catch (error) {
+      console.error("Ошибка при создании заявки:", error);
+    }
+  };
+
+  const onEditSubmit = async (data: ApplicationFormValues) => {
+    if (!selectedApplication) return;
+
+    try {
+      await updateApplication.mutateAsync({
+        id: selectedApplication.id,
+        payload: {
+          creditor: data.creditor,
+          amount: data.amount,
+          comment: data.comment,
+          template: data.template,
+          bank_email: data.bank_email,
+        },
+      });
+      setIsEditDialogOpen(false);
+      setSelectedApplication(null);
+    } catch (error) {
+      console.error("Ошибка при обновлении заявки:", error);
+    }
+  };
+
+  const onOtpSubmit = async (data: OtpFormValues) => {
+    if (!selectedApplication) return;
+
+    try {
+      await handleVerifyOtp(selectedApplication.id, data.code);
+    } catch (error) {
+      console.error("Ошибка при верификации OTP:", error);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        console.log("Код скопирован в буфер обмена");
+      })
+      .catch((err) => {
+        console.error("Ошибка при копировании: ", err);
+      });
+  };
 
   return (
     <div className="w-full min-h-screen flex flex-col items-center mt-5">
-      <CreateApplicationDialog />
-      <EditApplicationDialog />
-      <DeleteConfirmationDialog />
-      <GenerateDocumentDialog />
-      <SendEmailDialog />
-      <OtpDialog />
-      <StatusChangeDialog />
+      <CreateApplicationDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => {
+          setIsCreateDialogOpen(false);
+          setSelectedType(null);
+          createForm.reset({
+            creditor: undefined,
+            amount: 0,
+            comment: "",
+            template: undefined,
+            bank_email: "",
+          });
+        }}
+        selectedType={selectedType}
+        setSelectedType={setSelectedType}
+        creditors={creditors || []}
+        isLoadingCreditors={isLoadingCreditors}
+        createForm={createForm}
+        documentPreview={documentPreview}
+        onGeneratePDF={handleGeneratePDF}
+        createApplication={createApplication}
+        onSubmit={onCreateSubmit}
+      />
+
+      <EditApplicationDialog
+        isOpen={isEditDialogOpen}
+        onClose={() => {
+          setIsEditDialogOpen(false);
+          setSelectedApplication(null);
+        }}
+        selectedApplication={selectedApplication}
+        editForm={editForm}
+        updateApplication={updateApplication}
+        onSubmit={onEditSubmit}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => {
+          setIsDeleteDialogOpen(false);
+          setSelectedApplication(null);
+        }}
+        selectedApplication={selectedApplication}
+        deleteApplication={deleteApplication}
+        onConfirm={confirmDelete}
+      />
+
+      <GenerateDocumentDialog
+        isOpen={isDocumentDialogOpen}
+        onClose={() => {
+          setIsDocumentDialogOpen(false);
+          setSelectedApplication(null);
+        }}
+        selectedApplication={selectedApplication}
+        generateDocument={generateDocument}
+        onGenerate={handleGenerateDocument}
+      />
+
+      <SendEmailDialog
+        isOpen={isEmailDialogOpen}
+        onClose={() => {
+          setIsEmailDialogOpen(false);
+          setSelectedApplication(null);
+        }}
+        selectedApplication={selectedApplication}
+        generateDocument={generateDocument}
+        sendOtp={sendOtp}
+        emailProcessStep={emailProcessStep}
+        onStart={startEmailProcess}
+      />
+
+      <OtpDialog
+        isOpen={isOtpDialogOpen}
+        onClose={() => {
+          setIsOtpDialogOpen(false);
+          setSelectedApplication(null);
+          setOtpCode("");
+          setIsOtpSent(false);
+          otpForm.reset({ code: "" });
+          setEmailProcessStep("generating_document");
+        }}
+        selectedApplication={selectedApplication}
+        otpCode={otpCode}
+        isOtpSent={isOtpSent}
+        emailProcessStep={emailProcessStep}
+        otpForm={otpForm}
+        verifyOtp={verifyOtp}
+        sendEmail={sendEmail}
+        copyToClipboard={copyToClipboard}
+        onSubmit={onOtpSubmit}
+      />
+
+      <StatusChangeDialog
+        isOpen={isStatusDialogOpen}
+        onClose={() => {
+          setIsStatusDialogOpen(false);
+          setStatusChangeData(null);
+        }}
+        statusChangeData={statusChangeData}
+        setApplicationStatus={setApplicationStatus}
+        onConfirm={confirmStatusChange}
+      />
+
+      <PDFPreview pdfBlob={pdfBlob} fileName={pdfFileName} />
 
       <div className="flex flex-col gap-4">
         <div
@@ -1232,6 +1696,8 @@ export default function HomeWidget() {
                       <StatusDropdown
                         currentStatus={application.status}
                         applicationId={application.id}
+                        onStatusChange={handleStatusChange}
+                        isPending={setApplicationStatus.isPending}
                       />
                     </div>
                     <div className="space-y-1 text-sm text-gray-600">
@@ -1324,8 +1790,7 @@ export default function HomeWidget() {
         )}
       </div>
 
-      {/* Остальные секции остаются без изменений */}
-      {/* Секция "Долги" */}
+      {/* Остальные секции */}
       <div className="mt-10 w-full">
         <div className="flex justify-between items-center">
           <span className="text-black font-semibold text-[22px]">ДОЛГИ</span>
@@ -1347,7 +1812,6 @@ export default function HomeWidget() {
         </div>
       </div>
 
-      {/* Секция "Объявления" */}
       <div className="mt-10 w-full">
         <div className="flex justify-between items-center">
           <span className="text-black font-semibold text-[22px]">
@@ -1376,7 +1840,6 @@ export default function HomeWidget() {
         </div>
       </div>
 
-      {/* Секция "Мои документы" */}
       <div className="mt-10 w-full">
         <div className="flex justify-between items-center">
           <span className="text-black font-semibold text-[22px]">
@@ -1396,48 +1859,25 @@ export default function HomeWidget() {
           </div>
         </div>
         <div className="grid gap-2.5 mt-2">
-          <div className="flex items-center gap-[11px] justify-between">
-            <div className="flex gap-4">
-              <div className="rounded-[10px] w-[41px] h-[41px] bg-[#eeedf4] flex justify-center items-center">
-                <img src="/pdf.svg" alt="" />
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="flex items-center gap-[11px] justify-between"
+            >
+              <div className="flex gap-4">
+                <div className="rounded-[10px] w-[41px] h-[41px] bg-[#eeedf4] flex justify-center items-center">
+                  <img src="/pdf.svg" alt="" />
+                </div>
+                <div className="grid font-normal">
+                  <span className="text-[15px]">text</span>
+                  <span className="text-[12px]">
+                    Клиент: Иван Петров | МФО: CrediFast
+                  </span>
+                </div>
               </div>
-              <div className="grid font-normal">
-                <span className="text-[15px]">text</span>
-                <span className="text-[12px]">
-                  Клиент: Иван Петров | МФО: CrediFast
-                </span>
-              </div>
+              <EllipsisVertical />
             </div>
-            <EllipsisVertical />
-          </div>
-          <div className="flex items-center gap-[11px] justify-between">
-            <div className="flex gap-4">
-              <div className="rounded-[10px] w-[41px] h-[41px] bg-[#eeedf4] flex justify-center items-center">
-                <img src="/pdf.svg" alt="" />
-              </div>
-              <div className="grid font-normal">
-                <span className="text-[15px]">text</span>
-                <span className="text-[12px]">
-                  Клиент: Иван Петров | МФО: CrediFast
-                </span>
-              </div>
-            </div>
-            <EllipsisVertical />
-          </div>
-          <div className="flex items-center gap-[11px] justify-between">
-            <div className="flex gap-4">
-              <div className="rounded-[10px] w-[41px] h-[41px] bg-[#eeedf4] flex justify-center items-center">
-                <img src="/pdf.svg" alt="" />
-              </div>
-              <div className="grid font-normal">
-                <span className="text-[15px]">text</span>
-                <span className="text-[12px]">
-                  Клиент: Иван Петров | МФО: CrediFast
-                </span>
-              </div>
-            </div>
-            <EllipsisVertical />
-          </div>
+          ))}
         </div>
         <div className="flex justify-between items-center mt-[11px]">
           <span className="text-[#666e7d] font-medium text-[12px] uppercase">
@@ -1449,48 +1889,25 @@ export default function HomeWidget() {
           </div>
         </div>
         <div className="grid gap-2.5 mt-2 mb-7">
-          <div className="flex items-center gap-[11px] justify-between">
-            <div className="flex gap-4">
-              <div className="rounded-[10px] w-[41px] h-[41px] bg-[#eeedf4] flex justify-center items-center">
-                <img src="/pdf.svg" alt="" />
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="flex items-center gap-[11px] justify-between"
+            >
+              <div className="flex gap-4">
+                <div className="rounded-[10px] w-[41px] h-[41px] bg-[#eeedf4] flex justify-center items-center">
+                  <img src="/pdf.svg" alt="" />
+                </div>
+                <div className="grid font-normal">
+                  <span className="text-[15px]">text</span>
+                  <span className="text-[12px]">
+                    Клиент: Иван Петров | МФО: CrediFast
+                  </span>
+                </div>
               </div>
-              <div className="grid font-normal">
-                <span className="text-[15px]">text</span>
-                <span className="text-[12px]">
-                  Клиент: Иван Петров | МФО: CrediFast
-                </span>
-              </div>
+              <EllipsisVertical />
             </div>
-            <EllipsisVertical />
-          </div>
-          <div className="flex items-center gap-[11px] justify-between">
-            <div className="flex gap-4">
-              <div className="rounded-[10px] w-[41px] h-[41px] bg-[#eeedf4] flex justify-center items-center">
-                <img src="/pdf.svg" alt="" />
-              </div>
-              <div className="grid font-normal">
-                <span className="text-[15px]">text</span>
-                <span className="text-[12px]">
-                  Клиент: Иван Петров | МФО: CrediFast
-                </span>
-              </div>
-            </div>
-            <EllipsisVertical />
-          </div>
-          <div className="flex items-center gap-[11px] justify-between">
-            <div className="flex gap-4">
-              <div className="rounded-[10px] w-[41px] h-[41px] bg-[#eeedf4] flex justify-center items-center">
-                <img src="/pdf.svg" alt="" />
-              </div>
-              <div className="grid font-normal">
-                <span className="text-[15px]">text</span>
-                <span className="text-[12px]">
-                  Клиент: Иван Петров | МФО: CrediFast
-                </span>
-              </div>
-            </div>
-            <EllipsisVertical />
-          </div>
+          ))}
         </div>
       </div>
     </div>

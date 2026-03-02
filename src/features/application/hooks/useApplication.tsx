@@ -12,6 +12,9 @@ import {
   SendEmail,
   SetStatus,
   VerifyOtp,
+  GetCreditor,
+  PreviewDocument,
+  CreateFileApplication,
 } from "../services/api";
 import type { QueryParams } from "../types/payload";
 
@@ -192,6 +195,68 @@ export const useApplicationSendEmail = () => {
     },
     onError: (error) => {
       console.error("Ошибка при отправке Email:", error);
+    },
+  });
+};
+
+export const useCreditors = (type?: string) => {
+  return useQuery({
+    queryKey: ["Creditors", type],
+    queryFn: async () => {
+      const response = await GetCreditor(type);
+
+      if (!response.success) {
+        throw new Error(
+          response.error?.detail ||
+            response.error ||
+            "Ошибка при получении списка кредиторов",
+        );
+      }
+
+      return response.data;
+    },
+    enabled: !!type, // Запрос выполняется только если выбран тип
+  });
+};
+
+export const useDocumentPreview = () => {
+  return useMutation({
+    mutationFn: async (payload: any) => {
+      const blob = await PreviewDocument(payload);
+      return blob;
+    },
+  });
+};
+
+export const useApplicationUploadContract = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: number; payload: FormData }) => {
+      const response = await CreateFileApplication(payload, id);
+
+      // Обработка ошибки согласно вашему стандарту
+      if (!response.data.success) {
+        throw new Error(
+          response.data.error?.detail ||
+            response.data.error ||
+            "Ошибка при загрузке файла",
+        );
+      }
+
+      return response.data;
+    },
+
+    onSuccess: (variables) => {
+      // Обновляем данные конкретной заявки, чтобы увидеть прикрепленный файл
+      queryClient.invalidateQueries({
+        queryKey: ["Application", variables.id],
+      });
+
+      // Обновляем общий список заявок
+      queryClient.invalidateQueries({
+        queryKey: ["Applications"],
+      });
     },
   });
 };
