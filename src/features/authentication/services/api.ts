@@ -16,10 +16,11 @@ export const login = async (payload: any): Promise<AuthResponse> => {
   const authData = response.data;
 
 
-  tokenStore.set({
-    access: authData.tokens.access,
-    refresh: authData.tokens.refresh
-  });
+tokenStore.set({
+  access: authData.tokens.access,
+  refresh: authData.tokens.refresh,
+  roles: authData.user.roles
+});
 
   return authData;
 };

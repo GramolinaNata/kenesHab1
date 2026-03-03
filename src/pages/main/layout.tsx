@@ -1,4 +1,4 @@
-import { Outlet, Link } from "react-router-dom";
+import { Outlet, Link, useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import {
   PieChart,
@@ -26,6 +26,7 @@ type ChatMessage = {
 };
 
 export default function MainLayout() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -137,6 +138,18 @@ export default function MainLayout() {
     setAiQueryData(null);
   };
 
+  // Функция выхода
+  const handleLogout = () => {
+    // Очищаем весь localStorage
+    localStorage.clear();
+
+    // Закрываем sidebar
+    setOpen(false);
+
+    // Перенаправляем на страницу входа
+    navigate("/auth/login");
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {/* Header */}
@@ -232,7 +245,10 @@ export default function MainLayout() {
 
               {/* Bottom */}
               <div className="p-4 border-t border-gray-100">
-                <button className="flex items-center gap-3 text-gray-500 hover:text-gray-700 active:text-gray-800 p-3 rounded-lg hover:bg-gray-50 active:bg-gray-100 w-full">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 text-gray-500 hover:text-gray-700 active:text-gray-800 p-3 rounded-lg hover:bg-gray-50 active:bg-gray-100 w-full"
+                >
                   <LogOut className="w-5 h-5" />
                   <span className="text-sm font-medium">Выйти</span>
                 </button>

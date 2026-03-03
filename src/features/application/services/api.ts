@@ -65,3 +65,23 @@ export const PreviewDocument = async (payload: any) => {
 export const CreateFileApplication = (payload: any, id: number) => {
   return formDataApi.post(`/api/applications/${id}/upload-contract/`, payload);
 }
+
+export const CreateVacancy = (payload: any) => {
+  return clientApi.post("/api/vacancy/", payload);
+};
+
+export const GetVacancies = () => {
+  return clientApi.get("/api/vacancy/");
+};
+
+export const AcceptProposal = (id: number) => {
+  return clientApi.post(`/api/proposal/${id}/accept/`);
+};
+
+export const RejectProposal = (id: number) => {
+  return clientApi.post(`/api/proposal/${id}/reject/`);
+};
+
+export const RespondToVacancy = (id: number, payload: any) => {
+  return clientApi.post(`/api/vacancy/${id}/response/`, payload);
+};

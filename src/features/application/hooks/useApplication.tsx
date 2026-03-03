@@ -15,6 +15,11 @@ import {
   GetCreditor,
   PreviewDocument,
   CreateFileApplication,
+  CreateVacancy,
+  GetVacancies,
+  AcceptProposal,
+  RejectProposal,
+  RespondToVacancy,
 } from "../services/api";
 import type { QueryParams } from "../types/payload";
 
@@ -51,11 +56,38 @@ export const useApplicationCreate = () => {
   return useMutation({
     mutationFn: async (payload: any) => {
       const response = await CreateApplication(payload);
-      if (!response.success) throw new Error(response.error);
-      return response.data;
+
+      // Проверяем структуру ответа от axios
+      // axios оборачивает ответ в response.data
+      if (response.data) {
+        // Если API возвращает { success: true, data: { id: ... } }
+        if (response.data.success === false) {
+          throw new Error(response.data.error || "Ошибка при создании заявки");
+        }
+
+        // Возвращаем данные в зависимости от структуры
+        // Вариант 1: API возвращает { id: "...", ... }
+        if (response.data.id) {
+          return response.data;
+        }
+
+        // Вариант 2: API возвращает { data: { id: "..." } }
+        if (response.data.data?.id) {
+          return response.data.data;
+        }
+
+        // Вариант 3: Просто возвращаем response.data
+        return response.data;
+      }
+
+      throw new Error("Не удалось создать заявку");
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Заявка успешно создана:", data);
       queryClient.invalidateQueries({ queryKey: ["Applications"] });
+    },
+    onError: (error) => {
+      console.error("Ошибка при создании заявки:", error);
     },
   });
 };
@@ -235,15 +267,6 @@ export const useApplicationUploadContract = () => {
     mutationFn: async ({ id, payload }: { id: number; payload: FormData }) => {
       const response = await CreateFileApplication(payload, id);
 
-      // Обработка ошибки согласно вашему стандарту
-      if (!response.data.success) {
-        throw new Error(
-          response.data.error?.detail ||
-            response.data.error ||
-            "Ошибка при загрузке файла",
-        );
-      }
-
       return response.data;
     },
 
@@ -257,6 +280,118 @@ export const useApplicationUploadContract = () => {
       queryClient.invalidateQueries({
         queryKey: ["Applications"],
       });
+    },
+  });
+};
+
+export const useVacancyCreate = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: any) => {
+      const response = await CreateVacancy(payload);
+
+      // Обработка ответа согласно вашей логике в useApplicationCreate
+      if (response.data) {
+        if (response.data.success === false) {
+          throw new Error(
+            response.data.error || "Ошибка при создании вакансии",
+          );
+        }
+        return response.data;
+      }
+
+      throw new Error("Не удалось создать вакансию");
+    },
+    onSuccess: (data) => {
+      console.log("Вакансия успешно создана:", data);
+      // Обновляем список вакансий, если он существует
+      queryClient.invalidateQueries({ queryKey: ["Vacancies"] });
+    },
+    onError: (error: any) => {
+      console.error("Ошибка при создании вакансии:", error);
+    },
+  });
+};
+
+export const useVacancies = (params?: QueryParams) => {
+  return useQuery({
+    queryKey: ["Vacancies", params],
+    queryFn: async () => {
+      const response = await GetVacancies();
+
+      // Логика обработки успеха, как в вашем useApplications
+      if (!response.success) {
+        throw new Error(
+          response.error?.detail ||
+            response.error ||
+            "Ошибка при получении списка вакансий",
+        );
+      }
+
+      return response.data;
+    },
+  });
+};
+
+export const useProposalAccept = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await AcceptProposal(id);
+      if (!response.success) {
+        throw new Error(response.error || "Ошибка при принятии предложения");
+      }
+      return id;
+    },
+    onSuccess: (id) => {
+      // Обновляем списки и детализацию, чтобы UI синхронизировался
+      queryClient.invalidateQueries({ queryKey: ["Proposals"] });
+      queryClient.invalidateQueries({ queryKey: ["Proposal", id] });
+    },
+  });
+};
+
+export const useProposalReject = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await RejectProposal(id);
+      if (!response.success) {
+        throw new Error(response.error || "Ошибка при отклонении предложения");
+      }
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.invalidateQueries({ queryKey: ["Proposals"] });
+      queryClient.invalidateQueries({ queryKey: ["Proposal", id] });
+    },
+  });
+};
+
+export const useVacancyResponse = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: number; payload: any }) => {
+      const response = await RespondToVacancy(id, payload);
+
+      if (!response.success) {
+        throw new Error(response.error || "Ошибка при отправке отклика");
+      }
+
+      return { id };
+    },
+    onSuccess: (result) => {
+      // Обновляем данные конкретной вакансии и общий список
+      queryClient.invalidateQueries({ queryKey: ["Vacancy", result.id] });
+      queryClient.invalidateQueries({ queryKey: ["Vacancies"] });
+      console.log("Отклик успешно отправлен");
+    },
+    onError: (error: any) => {
+      console.error("Ошибка при отклике:", error.message);
     },
   });
 };

@@ -5,6 +5,7 @@ export const RegisterClient = lazy(() => import("../../pages/auth/register/clien
 export const Login = lazy(() => import("../../pages/auth/login/login"));
 export const Select = lazy(() => import("../../pages/auth/select/select"));
 export const RegisterCreditor = lazy(() => import("../../pages/auth/register/creditor"));
+export const RegisterLawyer = lazy(() => import("../../pages/auth/register/lawyer"));
 
 // Main компоненты
 export const Home = lazy(() => import("../../pages/main/home/home"));

@@ -12,17 +12,17 @@ export function SelectWidget() {
     {
       name: "Медиатор",
       desc: "Simplify leave requests. Track and approve effortlessly in the app",
-      link: "/auth/register/workshop",
+      link: "/auth/register/lawyer?mediator",
     },
     {
       name: "ОМБУДСМЕН",
       desc: "From advanced task tracking to complete project management tools",
-      link: "/admin",
+      link: "/auth/register/lawyer?ombudsman",
     },
     {
       name: "ЮРИСТ",
       desc: "From advanced task tracking to complete project management tools",
-      link: "/admin",
+      link: "/auth/register/lawyer?lawyer",
     },
     {
       name: "МФО",

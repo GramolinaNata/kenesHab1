@@ -4,7 +4,7 @@ import { TitleWidget } from "@/widgets/detali/statement/TitleWidget";
 export default function CreateLawyerScreen() {
   return (
     <>
-      <TitleWidget name="Обратиться к Юристу" />
+      <TitleWidget name="Обратиться к Юристу2" />
       <CreateLawyerWidget />
     </>
   );
