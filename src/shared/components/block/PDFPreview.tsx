@@ -13,12 +13,14 @@ interface PDFPreviewProps {
   pdfBlob: any | null;
   fileName: string;
   onClose?: () => void;
+  preventCloseOnOverlayClick?: boolean;
 }
 
 export const PDFPreview: React.FC<PDFPreviewProps> = ({
   pdfBlob,
   fileName,
   onClose,
+  preventCloseOnOverlayClick = false,
 }) => {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,7 +45,9 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
 
   const handleClose = () => {
     setIsOpen(false);
-    onClose?.();
+    if (onClose) {
+      onClose();
+    }
   };
 
   const handleDownload = () => {
@@ -64,13 +68,27 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
     }
   };
 
+  // Обработчик клика вне диалога
+  const handlePointerDownOutside = (e: Event) => {
+    if (preventCloseOnOverlayClick) {
+      e.preventDefault();
+    }
+  };
+
   if (!pdfBlob || !pdfUrl) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          handleClose();
+        }
+      }}
+    >
       <DialogContent
         className="sm:max-w-[900px] w-[95vw] max-h-[95vh] p-4 sm:p-6"
-        onPointerDownOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={handlePointerDownOutside}
         onEscapeKeyDown={(e) => {
           e.preventDefault();
           handleClose();

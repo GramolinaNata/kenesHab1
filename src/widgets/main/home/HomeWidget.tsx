@@ -137,6 +137,8 @@ export default function HomeWidget() {
         comment: data.comment,
         template: data.template,
         bank_email: data.bank_email,
+        contract_date: data.contract_date,
+        contract_number: data.contract_number,
       });
 
       setPdfBlob(blob);
@@ -270,6 +272,8 @@ export default function HomeWidget() {
         comment: data.comment,
         template: data.template,
         bank_email: data.bank_email,
+        contract_date: data.contract_date,
+        contract_number: data.contract_number,
       });
       return result;
     } catch (error) {
@@ -290,6 +294,8 @@ export default function HomeWidget() {
           comment: data.comment,
           template: data.template,
           bank_email: data.bank_email,
+          contract_date: data.contract_date,
+          contract_number: data.contract_number,
         },
       });
       setIsEditDialogOpen(false);
@@ -406,6 +412,7 @@ export default function HomeWidget() {
         pdfBlob={pdfBlob}
         fileName={pdfFileName}
         onClose={() => setPdfBlob(null)}
+        preventCloseOnOverlayClick={isCreateDialogOpen}
       />
       <LawyerDialog
         isOpen={isLawyerDialogOpen}
