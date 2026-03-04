@@ -20,6 +20,8 @@ import {
   AcceptProposal,
   RejectProposal,
   RespondToVacancy,
+  GetApplicationDetail,
+  UploadApplicationResponse,
 } from "../services/api";
 import type { QueryParams } from "../types/payload";
 
@@ -392,6 +394,65 @@ export const useVacancyResponse = () => {
     },
     onError: (error: any) => {
       console.error("Ошибка при отклике:", error.message);
+    },
+  });
+};
+
+export const useApplicationDetail = (id: number | undefined) => {
+  return useQuery({
+    queryKey: ["Application", id],
+    queryFn: async () => {
+      // Если id нет, queryFn не должна вызываться благодаря enabled,
+      // но добавим проверку для безопасности типов
+      if (!id) throw new Error("ID заявки не указан");
+
+      const response = await GetApplicationDetail(id);
+
+      if (!response.success) {
+        throw new Error(
+          response.error?.detail ||
+            response.error ||
+            "Ошибка при получении данных заявки",
+        );
+      }
+
+      return response.data;
+    },
+    enabled: !!id, // Запрос выполнится только если id существует (не 0, не undefined)
+    retry: 1, // Количество попыток при ошибке
+  });
+};
+
+export const useApplicationUploadResponse = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: number; payload: FormData }) => {
+      const response = await UploadApplicationResponse(id, payload);
+
+      // Проверка успеха согласно вашей архитектуре
+      if (response.data && response.data.success === false) {
+        throw new Error(response.data.error || "Ошибка при загрузке файла");
+      }
+
+      return { id, data: response.data };
+    },
+
+    onSuccess: (result) => {
+      // Обновляем данные конкретной заявки
+      queryClient.invalidateQueries({
+        queryKey: ["Application", result.id],
+      });
+
+      // Обновляем список всех заявок
+      queryClient.invalidateQueries({
+        queryKey: ["Applications"],
+      });
+
+      console.log("Файл ответа успешно загружен");
+    },
+    onError: (error: any) => {
+      console.error("Ошибка загрузки:", error.message);
     },
   });
 };

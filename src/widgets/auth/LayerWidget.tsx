@@ -46,12 +46,19 @@ export function LayerWidget() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Получаем sub_role из URL параметра
-  const subRoleFromUrl = searchParams.get("lawyer") as
-    | "lawyer"
-    | "mediator"
-    | "ombudsman"
-    | null;
+  // Получаем sub_role из URL параметра (ключ параметра и есть значение)
+  // Например: /auth/register/lawyer?mediator -> sub_role = "mediator"
+  const getSubRoleFromUrl = (): "lawyer" | "mediator" | "ombudsman" | null => {
+    const params = Object.fromEntries(searchParams.entries());
+    const firstParam = Object.keys(params)[0]; // Получаем первый ключ параметра
+
+    if (firstParam === "mediator") return "mediator";
+    if (firstParam === "ombudsman") return "ombudsman";
+    if (firstParam === "lawyer") return "lawyer";
+    return null;
+  };
+
+  const subRoleFromUrl = getSubRoleFromUrl();
 
   const {
     register: registerField,
@@ -68,7 +75,7 @@ export function LayerWidget() {
       password: "",
       confirm_password: "",
       role: "lawyer",
-      sub_role: subRoleFromUrl || "lawyer",
+      sub_role: subRoleFromUrl || "lawyer", // Подставляем значение из URL
     },
   });
 
@@ -76,12 +83,30 @@ export function LayerWidget() {
   useEffect(() => {
     if (subRoleFromUrl) {
       setValue("sub_role", subRoleFromUrl);
+      console.log("Установлен sub_role:", subRoleFromUrl); // Для отладки
     }
   }, [subRoleFromUrl, setValue]);
+
+  // Функция для отображения выбранной роли
+  const getRoleDisplay = () => {
+    if (subRoleFromUrl === "mediator") return "Медиатор";
+    if (subRoleFromUrl === "ombudsman") return "Омбудсмен";
+    if (subRoleFromUrl === "lawyer") return "Юрист";
+    return "Юрист";
+  };
+
+  // Функция для отображения иконки роли
+  const getRoleIcon = () => {
+    if (subRoleFromUrl === "mediator") return "⚖️";
+    if (subRoleFromUrl === "ombudsman") return "🛡️";
+    return "👨‍⚖️";
+  };
 
   const onSubmit = (data: RegisterFormData) => {
     // убираем confirm_password
     const { confirm_password, ...payload } = data;
+
+    console.log("Отправляемые данные:", payload); // Для отладки
 
     register(payload, {
       onSuccess: () => {
@@ -97,6 +122,31 @@ export function LayerWidget() {
           <div className="flex flex-col gap-4">
             <div className="grid">
               <span className="font-semibold text-[22px]">Регистрация</span>
+
+              {/* Блок с выбранной ролью */}
+              <div className="mt-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-[#1F74EC] bg-opacity-10 flex items-center justify-center text-2xl">
+                    {getRoleIcon()}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-[#1F74EC] font-medium uppercase tracking-wider">
+                      Выбранный статус
+                    </p>
+                    <p className="text-lg font-semibold text-gray-800">
+                      {getRoleDisplay()}
+                    </p>
+                    {subRoleFromUrl && subRoleFromUrl !== "lawyer" && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Специализация:{" "}
+                        {subRoleFromUrl === "mediator"
+                          ? "Медиация"
+                          : "Защита прав"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <form

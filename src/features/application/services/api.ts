@@ -85,3 +85,11 @@ export const RejectProposal = (id: number) => {
 export const RespondToVacancy = (id: number, payload: any) => {
   return clientApi.post(`/api/vacancy/${id}/response/`, payload);
 };
+
+export const GetApplicationDetail = (id: number) => {
+  return clientApi.get(`/api/applications/${id}/`);
+};
+
+export const UploadApplicationResponse = (id: number, payload: FormData) => {
+  return formDataApi.post(`/api/applications/${id}/upload-response/`, payload);
+};

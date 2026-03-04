@@ -40,6 +40,18 @@ import { LawyerDialog } from "@/shared/components/dialogs/LawyerDialog";
 import LawyerRequestsList from "@/shared/components/block/LawyerRequestsList";
 
 export default function HomeWidget() {
+  // Получаем роли пользователя из localStorage
+  const userRoles = JSON.parse(localStorage.getItem("userRoles") || "[]");
+  const isBorrower = userRoles.includes("borrower");
+  const isCreditor = userRoles.includes("creditor");
+  const isLawyer = userRoles.includes("lawyer");
+
+  // Показывать заявки могут creditor и borrower
+  const canViewApplications = isBorrower || isCreditor;
+
+  // Показывать объявления могут lawyer и borrower
+  const canViewAnnouncements = isLawyer || isBorrower;
+
   const { data: applicationsData, isLoading } = useApplications();
   const createApplication = useApplicationCreate();
   const updateApplication = useApplicationUpdate();
@@ -419,139 +431,146 @@ export default function HomeWidget() {
         onClose={() => setIsLawyerDialogOpen(false)}
       />
 
-      <div className="flex flex-col gap-4">
-        <div
-          onClick={() => handleCardClick("statement")}
-          className="cursor-pointer"
-        >
-          <AppealCard
-            variant="big"
-            title="Реструктуризация/урегулирование просроченной задолженности"
-            subtitle="Решим любые проблемы с МФО"
-            image="/blocknout.svg"
-            href="#"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
+      {/* Отображаем AppealCard только для роли borrower */}
+      {isBorrower && (
+        <div className="flex flex-col gap-4">
           <div
-            onClick={() => handleCardClick("lawyer")}
+            onClick={() => handleCardClick("statement")}
             className="cursor-pointer"
           >
             <AppealCard
-              title={
-                <>
-                  Обратиться <br /> к юристу
-                </>
-              }
-              image="/man.svg"
+              variant="big"
+              title="Реструктуризация/урегулирование просроченной задолженности"
+              subtitle="Решим любые проблемы с МФО"
+              image="/blocknout.svg"
               href="#"
             />
           </div>
-          <div
-            onClick={() => handleCardClick("mediator")}
-            className="cursor-pointer"
-          >
-            <AppealCard
-              title={
-                <>
-                  Обратиться <br /> к медиатору
-                </>
-              }
-              image="/man.svg"
-              href="#"
-            />
-          </div>
-        </div>
 
-        <div
-          onClick={() => handleCardClick("ombudsman")}
-          className="cursor-pointer"
-        >
-          <AppealCard
-            variant="big"
-            title={
-              <>
-                Обратиться <br /> к омбудсмену
-              </>
-            }
-            image="/Lawyer.svg"
-            href="#"
-          />
-        </div>
-      </div>
-
-      {/* Секция "Мои заявки" */}
-      <div className="mt-10 w-full">
-        <div className="flex justify-between items-center mb-4">
-          <span className="text-black font-semibold text-[22px]">
-            Мои заявки
-          </span>
-          <span className="text-[#1f74ec] text-[12px] font-bold">
-            Все заявки
-          </span>
-        </div>
-
-        {isLoading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1f74ec] mx-auto"></div>
-            <p className="mt-2 text-gray-500">Загрузка заявок...</p>
-          </div>
-        ) : applicationsData?.results &&
-          applicationsData?.results.length > 0 ? (
-          <div className="space-y-3">
-            {applicationsData?.results.map((application: any) => (
-              <ApplicationCard
-                key={application.id}
-                application={application}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onGenerateDocument={(app) => {
-                  setSelectedApplication(app);
-                  setIsDocumentDialogOpen(true);
-                }}
-                onSendEmail={(app) => {
-                  setSelectedApplication(app);
-                  setIsEmailDialogOpen(true);
-                }}
-                onStatusChange={handleStatusChange}
-                isStatusPending={setApplicationStatus.isPending}
-                isGeneratePending={generateDocument.isPending}
-                isEmailPending={
-                  generateDocument.isPending ||
-                  sendOtp.isPending ||
-                  verifyOtp.isPending ||
-                  sendEmail.isPending
+          <div className="grid grid-cols-2 gap-3">
+            <div
+              onClick={() => handleCardClick("lawyer")}
+              className="cursor-pointer"
+            >
+              <AppealCard
+                title={
+                  <>
+                    Обратиться <br /> к юристу
+                  </>
                 }
+                image="/man.svg"
+                href="#"
               />
-            ))}
+            </div>
+            <div
+              onClick={() => handleCardClick("mediator")}
+              className="cursor-pointer"
+            >
+              <AppealCard
+                title={
+                  <>
+                    Обратиться <br /> к медиатору
+                  </>
+                }
+                image="/man.svg"
+                href="#"
+              />
+            </div>
           </div>
-        ) : (
-          <div className="text-center py-8 bg-gray-50 rounded-xl">
-            <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">У вас пока нет созданных заявок</p>
-            <p className="text-sm text-gray-400 mt-1">
-              Создайте свою первую заявку выше
-            </p>
+
+          <div
+            onClick={() => handleCardClick("ombudsman")}
+            className="cursor-pointer"
+          >
+            <AppealCard
+              variant="big"
+              title={
+                <>
+                  Обратиться <br /> к омбудсмену
+                </>
+              }
+              image="/Lawyer.svg"
+              href="#"
+            />
           </div>
-        )}
-      </div>
-
-      {/* Секция "Объявления" */}
-      <div className="mt-10 w-full">
-        <div className="flex justify-between items-center">
-          <span className="text-black font-semibold text-[22px]">
-            Объявления
-          </span>
-          <span className="text-[#1f74ec] text-[12px] font-bold">
-            Подробнее
-          </span>
         </div>
+      )}
 
-        <div className="mt-3.5 grid items-center gap-3">
-          <LawyerRequestsList />
+      {/* Секция "Мои заявки" - только для creditor и borrower */}
+      {canViewApplications && (
+        <div className="mt-10 w-full">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-black font-semibold text-[22px]">
+              Мои заявки
+            </span>
+            <span className="text-[#1f74ec] text-[12px] font-bold">
+              Все заявки
+            </span>
+          </div>
+
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1f74ec] mx-auto"></div>
+              <p className="mt-2 text-gray-500">Загрузка заявок...</p>
+            </div>
+          ) : applicationsData?.results &&
+            applicationsData?.results.length > 0 ? (
+            <div className="space-y-3">
+              {applicationsData?.results.map((application: any) => (
+                <ApplicationCard
+                  key={application.id}
+                  application={application}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onGenerateDocument={(app) => {
+                    setSelectedApplication(app);
+                    setIsDocumentDialogOpen(true);
+                  }}
+                  onSendEmail={(app) => {
+                    setSelectedApplication(app);
+                    setIsEmailDialogOpen(true);
+                  }}
+                  onStatusChange={handleStatusChange}
+                  isStatusPending={setApplicationStatus.isPending}
+                  isGeneratePending={generateDocument.isPending}
+                  isEmailPending={
+                    generateDocument.isPending ||
+                    sendOtp.isPending ||
+                    verifyOtp.isPending ||
+                    sendEmail.isPending
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-gray-50 rounded-xl">
+              <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">У вас пока нет созданных заявок</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Создайте свою первую заявку выше
+              </p>
+            </div>
+          )}
         </div>
-      </div>
+      )}
+
+      {/* Секция "Объявления" - только для lawyer и borrower */}
+      {canViewAnnouncements && (
+        <div className="mt-10 w-full">
+          <div className="flex justify-between items-center">
+            <span className="text-black font-semibold text-[22px]">
+              Объявления
+            </span>
+            <span className="text-[#1f74ec] text-[12px] font-bold">
+              Подробнее
+            </span>
+          </div>
+
+          <div className="mt-3.5 grid items-center gap-3">
+            <LawyerRequestsList />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

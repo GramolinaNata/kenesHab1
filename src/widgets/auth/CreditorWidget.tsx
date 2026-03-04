@@ -46,12 +46,20 @@ export function CreaditorWidget() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Получаем sub_role из URL параметра
-  const subRoleFromUrl = searchParams.get("mfo") as
-    | "mfo"
-    | "bank"
-    | "private_investor"
-    | null;
+  // Получаем sub_role из URL параметра (ключ параметра и есть значение)
+  // Например: /auth/register/creditor?mfo -> sub_role = "mfo"
+  //          /auth/register/creditor?bank -> sub_role = "bank"
+  const getSubRoleFromUrl = (): "mfo" | "bank" | "private_investor" | null => {
+    const params = Object.fromEntries(searchParams.entries());
+    const firstParam = Object.keys(params)[0]; // Получаем первый ключ параметра
+
+    if (firstParam === "mfo") return "mfo";
+    if (firstParam === "bank") return "bank";
+    if (firstParam === "private_investor") return "private_investor";
+    return null;
+  };
+
+  const subRoleFromUrl = getSubRoleFromUrl();
 
   const {
     register: registerField,
@@ -68,7 +76,7 @@ export function CreaditorWidget() {
       password: "",
       confirm_password: "",
       role: "creditor",
-      sub_role: subRoleFromUrl || "mfo",
+      sub_role: subRoleFromUrl || "mfo", // Подставляем значение из URL, если нет - по умолчанию "mfo"
     },
   });
 
@@ -76,12 +84,29 @@ export function CreaditorWidget() {
   useEffect(() => {
     if (subRoleFromUrl) {
       setValue("sub_role", subRoleFromUrl);
+      console.log("Установлен sub_role:", subRoleFromUrl); // Для отладки
     }
   }, [subRoleFromUrl, setValue]);
+
+  // Функция для отображения выбранной роли
+  const getRoleDisplay = () => {
+    if (subRoleFromUrl === "bank") return "Банк";
+    if (subRoleFromUrl === "private_investor") return "Частный инвестор";
+    return "МФО";
+  };
+
+  // Функция для отображения иконки роли
+  const getRoleIcon = () => {
+    if (subRoleFromUrl === "bank") return "🏦";
+    if (subRoleFromUrl === "private_investor") return "💼";
+    return "💰";
+  };
 
   const onSubmit = (data: RegisterFormData) => {
     // убираем confirm_password
     const { confirm_password, ...payload } = data;
+
+    console.log("Отправляемые данные:", payload); // Для отладки
 
     register(payload, {
       onSuccess: () => {
@@ -97,6 +122,24 @@ export function CreaditorWidget() {
           <div className="flex flex-col gap-4">
             <div className="grid">
               <span className="font-semibold text-[22px]">Регистрация</span>
+
+              {/* Блок с выбранной ролью */}
+              <div className="mt-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-[#1F74EC] bg-opacity-10 flex items-center justify-center text-2xl">
+                    {getRoleIcon()}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-[#1F74EC] font-medium uppercase tracking-wider">
+                      Выбранный статус
+                    </p>
+                    <p className="text-lg font-semibold text-gray-800">
+                      {getRoleDisplay()}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Тип кредитора</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <form
@@ -122,7 +165,11 @@ export function CreaditorWidget() {
                   <div>
                     <LabeledInput
                       label="Название организации"
-                      placeholder="TOO MFO667"
+                      placeholder={
+                        subRoleFromUrl === "bank"
+                          ? "Название банка"
+                          : "TOO MFO667"
+                      }
                       error={errors.full_name?.message}
                       {...registerField("full_name")}
                     />

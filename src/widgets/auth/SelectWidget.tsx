@@ -1,37 +1,81 @@
 import { useState } from "react";
 
 export function SelectWidget() {
-  const [active, setActive] = useState("Клиент");
+  const [active, setActive] = useState("Заемщик");
+  const [expandedLawyer, setExpandedLawyer] = useState(false);
+  const [expandedCreditor, setExpandedCreditor] = useState(false);
 
-  const statuses = [
+  const mainStatuses = [
     {
-      name: "Клиент",
-      desc: "Exclusive analytics for smart decisions, staying ahead in your workflow",
+      name: "Заемщик",
       link: "/auth/register/client",
-    },
-    {
-      name: "Медиатор",
-      desc: "Simplify leave requests. Track and approve effortlessly in the app",
-      link: "/auth/register/lawyer?mediator",
-    },
-    {
-      name: "ОМБУДСМЕН",
-      desc: "From advanced task tracking to complete project management tools",
-      link: "/auth/register/lawyer?ombudsman",
+      type: "main",
     },
     {
       name: "ЮРИСТ",
-      desc: "From advanced task tracking to complete project management tools",
       link: "/auth/register/lawyer?lawyer",
+      type: "main",
+      hasSubcategories: true,
     },
     {
-      name: "МФО",
-      desc: "From advanced task tracking to complete project management tools",
-      link: "/auth/register/creditor?mfo",
+      name: "Кредитор",
+      link: "/auth/register/creditor?creditor",
+      type: "main",
+      hasSubcategories: true,
     },
   ];
 
-  const activeLink = statuses.find((s) => s.name === active)?.link || "#";
+  const lawyerSubcategories = [
+    {
+      name: "Медиатор",
+      link: "/auth/register/lawyer?mediator",
+      parent: "ЮРИСТ",
+    },
+    {
+      name: "Омбудсмен",
+      link: "/auth/register/lawyer?ombudsman",
+      parent: "ЮРИСТ",
+    },
+  ];
+
+  const creditorSubcategories = [
+    {
+      name: "Банк",
+      link: "/auth/register/creditor?bank",
+      parent: "Кредитор",
+    },
+    {
+      name: "МФО",
+      link: "/auth/register/creditor?mfo",
+      parent: "Кредитор",
+    },
+  ];
+
+  const allStatuses = [
+    ...mainStatuses,
+    ...lawyerSubcategories,
+    ...creditorSubcategories,
+  ];
+
+  const activeLink = allStatuses.find((s) => s.name === active)?.link || "#";
+
+  const handleLawyerClick = () => {
+    setActive("ЮРИСТ");
+    setExpandedLawyer(!expandedLawyer);
+    // Закрываем кредитор если открыт
+    if (expandedCreditor) setExpandedCreditor(false);
+  };
+
+  const handleCreditorClick = () => {
+    setActive("Кредитор");
+    setExpandedCreditor(!expandedCreditor);
+    // Закрываем юриста если открыт
+    if (expandedLawyer) setExpandedLawyer(false);
+  };
+
+  const handleSubcategoryClick = (name: string) => {
+    setActive(name);
+  };
 
   return (
     <div className="bg-[#1F74EC] w-full min-h-screen flex flex-col items-center pt-6">
@@ -46,27 +90,106 @@ export function SelectWidget() {
             </div>
 
             <div className="grid gap-[14px] pb-4">
-              {statuses.map((item) => (
-                <div
-                  key={item.name}
-                  onClick={() => setActive(item.name)}
-                  className={`flex items-center gap-[12px] rounded-[10px] px-[16px] py-[12px] cursor-pointer transition-colors duration-200 bg-white
-                    ${
-                      active === item.name
-                        ? "border border-[#1F74EC]"
-                        : "border border-[#E6E6E6] hover:border-[#1F74EC]"
-                    }`}
-                >
-                  <div className="min-w-[60px] min-h-[60px] rounded-[10px] bg-[repeating-linear-gradient(135deg,_#FF7E7E_0px,_#FF7E7E_2px,_transparent_2px,_transparent_8px)]" />
+              {mainStatuses.map((item) => (
+                <div key={item.name}>
+                  <div
+                    onClick={
+                      item.name === "ЮРИСТ"
+                        ? handleLawyerClick
+                        : item.name === "Кредитор"
+                          ? handleCreditorClick
+                          : () => setActive(item.name)
+                    }
+                    className={`flex items-center gap-[12px] rounded-[10px] px-[16px] py-[12px] cursor-pointer transition-colors duration-200 bg-white
+                      ${
+                        active === item.name ||
+                        (item.name === "ЮРИСТ" && expandedLawyer) ||
+                        (item.name === "Кредитор" && expandedCreditor)
+                          ? "border border-[#1F74EC]"
+                          : "border border-[#E6E6E6] hover:border-[#1F74EC]"
+                      }`}
+                  >
+                    <div className="min-w-[60px] min-h-[60px] rounded-[10px] bg-[repeating-linear-gradient(135deg,_#FF7E7E_0px,_#FF7E7E_2px,_transparent_2px,_transparent_8px)]" />
 
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-[16px] leading-[20px] break-words">
-                      {item.name}
-                    </p>
-                    <p className="text-[13px] text-[#969da6] leading-[18px] break-words">
-                      {item.desc}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[16px] leading-[20px] break-words">
+                        {item.name}
+                      </p>
+                    </div>
+
+                    {item.hasSubcategories && (
+                      <svg
+                        className={`w-5 h-5 transition-transform duration-200 ${
+                          (item.name === "ЮРИСТ" && expandedLawyer) ||
+                          (item.name === "Кредитор" && expandedCreditor)
+                            ? "rotate-180"
+                            : ""
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    )}
                   </div>
+
+                  {/* Подкатегории юриста */}
+                  {item.name === "ЮРИСТ" && expandedLawyer && (
+                    <div className="ml-8 mt-2 space-y-2">
+                      {lawyerSubcategories.map((sub) => (
+                        <div
+                          key={sub.name}
+                          onClick={() => handleSubcategoryClick(sub.name)}
+                          className={`flex items-center gap-[12px] rounded-[10px] px-[16px] py-[10px] cursor-pointer transition-colors duration-200 bg-white
+                            ${
+                              active === sub.name
+                                ? "border border-[#1F74EC]"
+                                : "border border-[#E6E6E6] hover:border-[#1F74EC]"
+                            }`}
+                        >
+                          <div className="min-w-[40px] min-h-[40px] rounded-[8px] bg-[repeating-linear-gradient(135deg,_#FF7E7E_0px,_#FF7E7E_2px,_transparent_2px,_transparent_8px)]" />
+
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-[14px] leading-[18px] break-words">
+                              {sub.name}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Подкатегории кредитора */}
+                  {item.name === "Кредитор" && expandedCreditor && (
+                    <div className="ml-8 mt-2 space-y-2">
+                      {creditorSubcategories.map((sub) => (
+                        <div
+                          key={sub.name}
+                          onClick={() => handleSubcategoryClick(sub.name)}
+                          className={`flex items-center gap-[12px] rounded-[10px] px-[16px] py-[10px] cursor-pointer transition-colors duration-200 bg-white
+                            ${
+                              active === sub.name
+                                ? "border border-[#1F74EC]"
+                                : "border border-[#E6E6E6] hover:border-[#1F74EC]"
+                            }`}
+                        >
+                          <div className="min-w-[40px] min-h-[40px] rounded-[8px] bg-[repeating-linear-gradient(135deg,_#FF7E7E_0px,_#FF7E7E_2px,_transparent_2px,_transparent_8px)]" />
+
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-[14px] leading-[18px] break-words">
+                              {sub.name}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
