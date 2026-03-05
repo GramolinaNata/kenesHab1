@@ -124,105 +124,40 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
     return parts[parts.length - 1] || "document";
   };
 
-  // Проверяем наличие документов
+  // Проверяем наличие документов (без множественных форм)
   const hasDocuments =
     applicationDetail &&
-    (applicationDetail.document?.file ||
-      applicationDetail.contract?.file ||
-      applicationDetail.creditor_response?.file ||
-      (applicationDetail.documents && applicationDetail.documents.length > 0) ||
-      (applicationDetail.contracts && applicationDetail.contracts.length > 0) ||
-      (applicationDetail.creditor_responses &&
-        applicationDetail.creditor_responses.length > 0));
+    (applicationDetail.document?.file || applicationDetail.contract?.file);
 
-  // Собираем все документы в один массив для удобного отображения
+  // Собираем все документы в один массив (только одиночные поля, без массивов)
   const getAllDocuments = () => {
     const docs = [];
 
-    // Сгенерированный документ
+    // Сгенерированный документ (document - единственное число)
     if (applicationDetail?.document?.file) {
       docs.push({
-        id: `doc-main-${applicationDetail.document.id}`,
+        id: `document-${applicationDetail.document.id}`,
         url: applicationDetail.document.file,
-        title: "Генерированный документ",
-        subtitle: applicationDetail.document.template_name,
+        title: "Сгенерированный документ",
+        subtitle: applicationDetail.document.template_name || null,
         icon: <FileText className="h-5 w-5 text-blue-600" />,
-        type: "generated",
+        type: "document",
         signed: applicationDetail.document.signed,
       });
     }
 
-    // Массив documents
-    if (applicationDetail?.documents) {
-      applicationDetail.documents.forEach((doc: any, index: number) => {
-        docs.push({
-          id: `doc-${doc.id || index}`,
-          url: doc.file,
-          title: doc.template_name || `Документ ${index + 1}`,
-          subtitle: doc.signed ? "✓ Подписан" : null,
-          icon: <FileText className="h-5 w-5 text-blue-600" />,
-          type: "document",
-          signed: doc.signed,
-        });
-      });
-    }
-
-    // Договор заемщика
+    // Договор (contract - единственное число)
     if (applicationDetail?.contract?.file) {
       docs.push({
-        id: `contract-main-${applicationDetail.contract.id}`,
+        id: `contract-${applicationDetail.contract.id}`,
         url: applicationDetail.contract.file,
-        title: "Договор заемщика",
+        title: "Договор",
         subtitle: applicationDetail.contract.number
           ? `№${applicationDetail.contract.number}${applicationDetail.contract.date ? ` от ${applicationDetail.contract.date}` : ""}`
           : null,
         icon: <File className="h-5 w-5 text-green-600" />,
         type: "contract",
       });
-    }
-
-    // Массив contracts
-    if (applicationDetail?.contracts) {
-      applicationDetail.contracts.forEach((contract: any, index: number) => {
-        docs.push({
-          id: `contract-${contract.id || index}`,
-          url: contract.file,
-          title: contract.number
-            ? `Договор №${contract.number}`
-            : `Договор ${index + 1}`,
-          subtitle: contract.date ? `от ${contract.date}` : null,
-          icon: <File className="h-5 w-5 text-green-600" />,
-          type: "contract",
-        });
-      });
-    }
-
-    // Ответ кредитора
-    if (applicationDetail?.creditor_response?.file) {
-      docs.push({
-        id: `response-main`,
-        url: applicationDetail.creditor_response.file,
-        title: "Ответ кредитора",
-        subtitle: null,
-        icon: <FileText className="h-5 w-5 text-purple-600" />,
-        type: "response",
-      });
-    }
-
-    // Массив creditor_responses
-    if (applicationDetail?.creditor_responses) {
-      applicationDetail.creditor_responses.forEach(
-        (response: any, index: number) => {
-          docs.push({
-            id: `response-${index}`,
-            url: response.file,
-            title: `Ответ кредитора ${index + 1}`,
-            subtitle: null,
-            icon: <FileText className="h-5 w-5 text-purple-600" />,
-            type: "response",
-          });
-        },
-      );
     }
 
     return docs;
@@ -401,7 +336,7 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
             )}
           </div>
 
-          {/* Нижняя панель с кнопкой загрузки ответа кредитора */}
+          {/* Нижняя панель с кнопкой загрузки ответа */}
           <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
             <input
               type="file"
@@ -423,7 +358,7 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
               ) : (
                 <>
                   <Upload className="h-4 w-4" />
-                  Загрузить ответ кредитора
+                  Загрузить ответ
                 </>
               )}
             </Button>

@@ -153,19 +153,25 @@ export const CreateApplicationDialog: React.FC<
 
     if (selectedFile) {
       const formData = new FormData();
-      formData.append("contract", selectedFile);
+      formData.append("file", selectedFile); // ← вот здесь меняем "contract" на "file"
       formData.append("number", data.contract_number || "");
 
-      let formattedDate = "";
       if (data.contract_date) {
-        formattedDate = data.contract_date.toISOString().split("T")[0];
+        const dateStr = String(data.contract_date);
+        formData.append("date", dateStr);
+      } else {
+        formData.append("date", "");
       }
-      formData.append("date", formattedDate);
 
-      await uploadContract.mutateAsync({
-        id: applicationId,
-        payload: formData,
-      });
+      try {
+        await uploadContract.mutateAsync({
+          id: applicationId,
+          payload: formData, // теперь FormData содержит поле "file" вместо "contract"
+        });
+      } catch (error: any) {
+        console.error("Ошибка загрузки:", error);
+        throw error;
+      }
     }
 
     return applicationId;
@@ -488,16 +494,9 @@ export const CreateApplicationDialog: React.FC<
                           type="date"
                           className="w-full"
                           disabled={isUploading}
-                          value={
-                            field.value instanceof Date
-                              ? field.value.toISOString().split("T")[0]
-                              : ""
-                          }
+                          value={field.value || ""}
                           onChange={(e) => {
-                            const dateValue = e.target.value
-                              ? new Date(e.target.value)
-                              : null;
-                            field.onChange(dateValue);
+                            field.onChange(e.target.value);
                           }}
                         />
                       </FormControl>

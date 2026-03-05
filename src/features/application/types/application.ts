@@ -8,7 +8,7 @@ export const applicationFormSchema = z.object({
   template: z.number({ message: "Выберите шаблон" }),
   bank_email: z.string().email("Некорректный email"),
   contract_number: z.string().optional(),
-  contract_date: z.date().optional().nullable(),
+  contract_date: z.string().optional().nullable(),
   contract_file: z.any().optional(),
 });
 

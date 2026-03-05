@@ -93,3 +93,7 @@ export const GetApplicationDetail = (id: number) => {
 export const UploadApplicationResponse = (id: number, payload: FormData) => {
   return formDataApi.post(`/api/applications/${id}/upload-response/`, payload);
 };
+
+export const GetVacancyResponses = (id: number) => {
+  return clientApi.get(`/api/vacancy/${id}/response/`);
+};

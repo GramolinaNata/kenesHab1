@@ -36,7 +36,10 @@ import {
   MOCK_TEMPLATES,
   TEMPLATE_ID_BY_CARD_TYPE,
 } from "@/features/application/constants/application";
-import { LawyerDialog } from "@/shared/components/dialogs/LawyerDialog";
+import {
+  AppealDialog,
+  type AppealType,
+} from "@/shared/components/dialogs/AppealDialog";
 import LawyerRequestsList from "@/shared/components/block/LawyerRequestsList";
 
 export default function HomeWidget() {
@@ -66,7 +69,15 @@ export default function HomeWidget() {
   const [pdfBlob, setPdfBlob] = useState(null);
   const [pdfFileName, setPdfFileName] = useState<string>("document.pdf");
   const [, setIsPdfLoading] = useState(false);
-  const [isLawyerDialogOpen, setIsLawyerDialogOpen] = useState(false);
+
+  // Состояния для диалогов обращений
+  const [appealDialog, setAppealDialog] = useState<{
+    isOpen: boolean;
+    type: AppealType;
+  }>({
+    isOpen: false,
+    type: "lawyer",
+  });
 
   const {
     // States
@@ -121,11 +132,16 @@ export default function HomeWidget() {
   const handleCardClick = (type: string) => {
     setApplicationType(type);
 
-    if (type === "lawyer") {
-      setIsLawyerDialogOpen(true);
+    // Для lawyer, mediator, ombudsman открываем универсальный диалог
+    if (type === "lawyer" || type === "mediator" || type === "ombudsman") {
+      setAppealDialog({
+        isOpen: true,
+        type: type as AppealType,
+      });
       return;
     }
 
+    // Для остальных типов открываем обычный диалог создания заявки
     const templateId = TEMPLATE_ID_BY_CARD_TYPE[type];
     if (templateId) {
       createForm.setValue("template", templateId);
@@ -322,6 +338,10 @@ export default function HomeWidget() {
     await handleVerifyOtp(selectedApplication.id, data.code);
   };
 
+  const closeAppealDialog = () => {
+    setAppealDialog({ ...appealDialog, isOpen: false });
+  };
+
   return (
     <div className="w-full min-h-screen flex flex-col items-center mt-5">
       <CreateApplicationDialog
@@ -420,15 +440,18 @@ export default function HomeWidget() {
         onConfirm={confirmStatusChange}
       />
 
+      {/* Универсальный диалог для обращений */}
+      <AppealDialog
+        isOpen={appealDialog.isOpen}
+        onClose={closeAppealDialog}
+        type={appealDialog.type}
+      />
+
       <PDFPreview
         pdfBlob={pdfBlob}
         fileName={pdfFileName}
         onClose={() => setPdfBlob(null)}
         preventCloseOnOverlayClick={isCreateDialogOpen}
-      />
-      <LawyerDialog
-        isOpen={isLawyerDialogOpen}
-        onClose={() => setIsLawyerDialogOpen(false)}
       />
 
       {/* Отображаем AppealCard только для роли borrower */}

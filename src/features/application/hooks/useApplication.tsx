@@ -22,6 +22,7 @@ import {
   RespondToVacancy,
   GetApplicationDetail,
   UploadApplicationResponse,
+  GetVacancyResponses,
 } from "../services/api";
 import type { QueryParams } from "../types/payload";
 
@@ -454,5 +455,27 @@ export const useApplicationUploadResponse = () => {
     onError: (error: any) => {
       console.error("Ошибка загрузки:", error.message);
     },
+  });
+};
+
+export const useVacancyResponses = (id: number | undefined) => {
+  return useQuery({
+    queryKey: ["VacancyResponses", id],
+    queryFn: async () => {
+      if (!id) throw new Error("ID вакансии не указан");
+
+      const response = await GetVacancyResponses(id);
+
+      if (!response.success) {
+        throw new Error(
+          response.error?.detail ||
+            response.error ||
+            "Ошибка при получении откликов на вакансию",
+        );
+      }
+
+      return response.data;
+    },
+    enabled: !!id, // Запрос не пойдет, пока нет ID
   });
 };

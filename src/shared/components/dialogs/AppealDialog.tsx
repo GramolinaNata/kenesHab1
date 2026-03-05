@@ -2,7 +2,14 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, AlertCircle, X } from "lucide-react";
+import {
+  Loader2,
+  AlertCircle,
+  X,
+  Briefcase,
+  Scale,
+  Shield,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -33,25 +40,60 @@ import {
   useVacancyCreate,
 } from "@/features/application/hooks/useApplication";
 
-// Схема валидации - делаем все поля обязательными в схеме
-const lawyerFormSchema = z.object({
+// Типы обращений
+export type AppealType = "lawyer" | "mediator" | "ombudsman";
+
+// Конфигурация для каждого типа обращения
+const APPEAL_CONFIG = {
+  lawyer: {
+    title: "Обращение к юристу",
+    icon: Briefcase,
+    iconColor: "text-green-600",
+    bgColor: "bg-green-50",
+    buttonColor: "bg-green-600 hover:bg-green-700",
+    lawyerType: "lawyer",
+    description: "Получите профессиональную юридическую консультацию",
+  },
+  mediator: {
+    title: "Обращение к медиатору",
+    icon: Scale,
+    iconColor: "text-blue-600",
+    bgColor: "bg-blue-50",
+    buttonColor: "bg-blue-600 hover:bg-blue-700",
+    lawyerType: "mediator",
+    description: "Поможем урегулировать спор мирным путем",
+  },
+  ombudsman: {
+    title: "Обращение к омбудсмену",
+    icon: Shield,
+    iconColor: "text-purple-600",
+    bgColor: "bg-purple-50",
+    buttonColor: "bg-purple-600 hover:bg-purple-700",
+    lawyerType: "ombudsman",
+    description: "Защита ваших прав и законных интересов",
+  },
+} as const;
+
+// Схема валидации
+const appealFormSchema = z.object({
   application: z.string().min(1, "Выберите заявку"),
-  lawyer_type: z.string(), // убираем default, сделаем обязательным
+  lawyer_type: z.string(),
   comment: z.string().optional(),
   fee: z.string().min(1, "Укажите сумму гонорара"),
 });
 
-// Тип формы на основе схемы
-type LawyerFormValues = z.infer<typeof lawyerFormSchema>;
+type AppealFormValues = z.infer<typeof appealFormSchema>;
 
-interface LawyerDialogProps {
+interface AppealDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  type: AppealType;
 }
 
-export const LawyerDialog: React.FC<LawyerDialogProps> = ({
+export const AppealDialog: React.FC<AppealDialogProps> = ({
   isOpen,
   onClose,
+  type,
 }) => {
   const [submitError, setSubmitError] = React.useState<string | null>(null);
 
@@ -59,21 +101,34 @@ export const LawyerDialog: React.FC<LawyerDialogProps> = ({
     useApplications();
   const createLawyerRequest = useVacancyCreate();
 
-  // Форма с явно указанным типом
-  const form = useForm<LawyerFormValues>({
-    resolver: zodResolver(lawyerFormSchema),
+  const config = APPEAL_CONFIG[type];
+  const Icon = config.icon;
+
+  // Форма
+  const form = useForm<AppealFormValues>({
+    resolver: zodResolver(appealFormSchema),
     defaultValues: {
       application: "",
-      lawyer_type: "lawyer", // значение по умолчанию здесь
+      lawyer_type: config.lawyerType,
       comment: "",
       fee: "",
     },
   });
 
-  const onSubmit = async (data: LawyerFormValues) => {
+  // Сбрасываем форму при смене типа
+  React.useEffect(() => {
+    if (isOpen) {
+      form.setValue("lawyer_type", config.lawyerType);
+    }
+  }, [isOpen, type, config.lawyerType, form]);
+
+  const onSubmit = async (data: AppealFormValues) => {
     try {
       setSubmitError(null);
-      await createLawyerRequest.mutateAsync(data);
+      await createLawyerRequest.mutateAsync({
+        ...data,
+        lawyer_type: config.lawyerType, // Убеждаемся, что тип правильный
+      });
       form.reset();
       onClose();
     } catch (error: any) {
@@ -95,9 +150,12 @@ export const LawyerDialog: React.FC<LawyerDialogProps> = ({
       <DialogContent className="sm:max-w-[500px] w-[100vw] h-[100vh] sm:h-auto sm:max-h-[90vh] p-0 m-0 rounded-none sm:rounded-lg overflow-hidden">
         {/* Мобильная шапка */}
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 sm:hidden flex items-center justify-between p-4">
-          <DialogTitle className="text-lg font-semibold">
-            Обращение к юристу
-          </DialogTitle>
+          <div className="flex items-center gap-2">
+            <Icon className={`h-5 w-5 ${config.iconColor}`} />
+            <DialogTitle className="text-lg font-semibold">
+              {config.title}
+            </DialogTitle>
+          </div>
           <DialogClose asChild>
             <Button
               variant="ghost"
@@ -111,13 +169,17 @@ export const LawyerDialog: React.FC<LawyerDialogProps> = ({
 
         {/* Десктопная шапка */}
         <DialogHeader className="hidden sm:block px-6 pt-6">
-          <DialogTitle className="text-xl font-semibold">
-            Обращение к юристу
-          </DialogTitle>
+          <div className="flex items-center gap-2 mb-1">
+            <Icon className={`h-6 w-6 ${config.iconColor}`} />
+            <DialogTitle className="text-xl font-semibold">
+              {config.title}
+            </DialogTitle>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">{config.description}</p>
         </DialogHeader>
 
         {/* Форма */}
-        <div className="overflow-y-auto h-[calc(100vh-64px)] sm:h-auto sm:max-h-[calc(90vh-120px)] p-4 sm:p-6">
+        <div className="overflow-y-auto h-[calc(100vh-64px)] sm:h-auto sm:max-h-[calc(90vh-140px)] p-4 sm:p-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               {/* Выбор заявки */}
@@ -185,11 +247,8 @@ export const LawyerDialog: React.FC<LawyerDialogProps> = ({
                         placeholder="Опишите вашу ситуацию..."
                         className="min-h-[100px] w-full"
                         disabled={createLawyerRequest.isPending}
+                        {...field}
                         value={field.value || ""}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
                       />
                     </FormControl>
                     <FormMessage />
@@ -223,6 +282,15 @@ export const LawyerDialog: React.FC<LawyerDialogProps> = ({
                 )}
               />
 
+              {/* Информационный блок */}
+              <div className={`${config.bgColor} p-3 rounded-lg`}>
+                <p className={`text-xs ${config.iconColor}`}>
+                  <span className="font-medium">Важно:</span> После отправки
+                  обращения вы получите уведомление о его статусе. Обычно ответ
+                  приходит в течение 24 часов.
+                </p>
+              </div>
+
               {/* Ошибка отправки */}
               {submitError && (
                 <div className="p-2 bg-red-50 border border-red-200 rounded-md">
@@ -234,12 +302,13 @@ export const LawyerDialog: React.FC<LawyerDialogProps> = ({
               )}
 
               {/* Кнопки */}
-              <div className="flex justify-end space-x-2 pt-4">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleClose}
                   disabled={createLawyerRequest.isPending}
+                  className="w-full sm:w-auto"
                 >
                   Отмена
                 </Button>
@@ -248,7 +317,7 @@ export const LawyerDialog: React.FC<LawyerDialogProps> = ({
                   disabled={
                     createLawyerRequest.isPending || isLoadingApplications
                   }
-                  className="bg-[#1f74ec] hover:bg-[#1a65d4]"
+                  className={`w-full sm:w-auto ${config.buttonColor}`}
                 >
                   {createLawyerRequest.isPending ? (
                     <>
@@ -256,7 +325,7 @@ export const LawyerDialog: React.FC<LawyerDialogProps> = ({
                       Отправка...
                     </>
                   ) : (
-                    "Отправить обращение"
+                    `Отправить обращение`
                   )}
                 </Button>
               </div>
