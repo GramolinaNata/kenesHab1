@@ -393,13 +393,17 @@ export const CreateApplicationDialog: React.FC<
                       <FormControl>
                         <Input
                           type="number"
-                          placeholder="0"
+                          placeholder="Введите сумму"
                           className="w-full"
                           disabled={isUploading}
                           {...field}
+                          value={field.value || ""}
                           onChange={(e) => {
-                            const value = parseFloat(e.target.value);
-                            field.onChange(isNaN(value) ? 0 : value);
+                            const value =
+                              e.target.value === ""
+                                ? undefined
+                                : parseFloat(e.target.value);
+                            field.onChange(value);
                           }}
                         />
                       </FormControl>
@@ -407,7 +411,6 @@ export const CreateApplicationDialog: React.FC<
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={createForm.control}
                   name="template"

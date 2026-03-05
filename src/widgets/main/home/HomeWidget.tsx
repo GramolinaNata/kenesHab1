@@ -99,7 +99,6 @@ export default function HomeWidget() {
     setSelectedApplication,
     setApplicationType,
     statusChangeData,
-    setStatusChangeData,
     otpCode,
     setOtpCode,
     setIsOtpSent,
@@ -259,22 +258,6 @@ export default function HomeWidget() {
     } catch (error) {
       console.error("Ошибка при верификации OTP:", error);
     }
-  };
-
-  const handleStatusChange = async (
-    applicationId: number,
-    newStatus: string,
-  ) => {
-    const currentStatus = applicationsData?.results.find(
-      (app: any) => app.id === applicationId,
-    )?.status;
-
-    setStatusChangeData({
-      id: applicationId,
-      currentStatus: currentStatus || "",
-      newStatus,
-    });
-    setIsStatusDialogOpen(true);
   };
 
   const confirmStatusChange = async () => {
@@ -553,8 +536,6 @@ export default function HomeWidget() {
                     setSelectedApplication(app);
                     setIsEmailDialogOpen(true);
                   }}
-                  onStatusChange={handleStatusChange}
-                  isStatusPending={setApplicationStatus.isPending}
                   isGeneratePending={generateDocument.isPending}
                   isEmailPending={
                     generateDocument.isPending ||

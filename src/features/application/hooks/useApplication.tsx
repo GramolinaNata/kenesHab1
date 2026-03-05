@@ -23,6 +23,7 @@ import {
   GetApplicationDetail,
   UploadApplicationResponse,
   GetVacancyResponses,
+  GetVacancyDetail,
 } from "../services/api";
 import type { QueryParams } from "../types/payload";
 
@@ -477,5 +478,28 @@ export const useVacancyResponses = (id: number | undefined) => {
       return response.data;
     },
     enabled: !!id, // Запрос не пойдет, пока нет ID
+  });
+};
+
+export const useVacancyDetail = (id: number | undefined) => {
+  return useQuery({
+    queryKey: ["Vacancy", id],
+    queryFn: async () => {
+      if (!id) throw new Error("ID вакансии не указан");
+
+      const response = await GetVacancyDetail(id);
+
+      if (!response.success) {
+        throw new Error(
+          response.error?.detail ||
+            response.error ||
+            "Ошибка при получении данных вакансии",
+        );
+      }
+
+      return response.data;
+    },
+    enabled: !!id, // Запрос не уйдет, если id не передан (например, пока роут не загрузился)
+    staleTime: 1000 * 60 * 5, // Данные считаются свежими 5 минут
   });
 };

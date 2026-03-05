@@ -1,44 +1,33 @@
 import React from "react";
-import { Clock, CheckCircle, AlertCircle } from "lucide-react";
-import { Badge } from "@/shared/components/ui/badge";
-import type { ApplicationStatus } from "@/features/application/types/application";
 
 interface StatusBadgeProps {
-  status: ApplicationStatus | string;
+  status: string;
+  statusDisplay: string; // Обязательное поле для отображения
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
-  switch (status) {
-    case "NEW":
-      return (
-        <Badge
-          variant="outline"
-          className="bg-blue-50 text-blue-700 border-blue-200"
-        >
-          <Clock className="w-3 h-3 mr-1" />
-          Новая
-        </Badge>
-      );
-    case "IN_PROGRESS":
-      return (
-        <Badge
-          variant="outline"
-          className="bg-yellow-50 text-yellow-700 border-yellow-200"
-        >
-          <AlertCircle className="w-3 h-3 mr-1" />В работе
-        </Badge>
-      );
-    case "COMPLETED":
-      return (
-        <Badge
-          variant="outline"
-          className="bg-green-50 text-green-700 border-green-200"
-        >
-          <CheckCircle className="w-3 h-3 mr-1" />
-          Завершена
-        </Badge>
-      );
-    default:
-      return <Badge variant="outline">{status}</Badge>;
-  }
+const statusStyles = {
+  NEW: "bg-blue-100 text-blue-800",
+  IN_WORK: "bg-yellow-100 text-yellow-800",
+  DONE: "bg-green-100 text-green-800",
+  REJECTED: "bg-red-100 text-red-800",
+  ARCHIVED: "bg-gray-100 text-gray-800",
+  open: "bg-green-100 text-green-800",
+  in_work: "bg-yellow-100 text-yellow-800",
+  in_progress: "bg-blue-100 text-blue-800",
+  closed: "bg-gray-100 text-gray-800",
+} as const;
+
+export const StatusBadge: React.FC<StatusBadgeProps> = ({
+  status,
+  statusDisplay,
+}) => {
+  const style =
+    statusStyles[status as keyof typeof statusStyles] ||
+    "bg-gray-100 text-gray-800";
+
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${style}`}>
+      {statusDisplay}
+    </span>
+  );
 };

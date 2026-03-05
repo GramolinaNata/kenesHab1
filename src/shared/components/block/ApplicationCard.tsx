@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   MoreVertical,
   Edit,
@@ -11,6 +11,7 @@ import {
   Upload,
   Loader2,
   X,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -42,8 +43,6 @@ interface ApplicationCardProps {
   onDelete: (app: any) => void;
   onGenerateDocument: (app: any) => void;
   onSendEmail: (app: any) => void;
-  onStatusChange: (id: number, status: string) => void;
-  isStatusPending: boolean;
   isGeneratePending: boolean;
   isEmailPending: boolean;
 }
@@ -54,8 +53,7 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
   onDelete,
   onGenerateDocument,
   onSendEmail,
-  onStatusChange,
-  isStatusPending,
+
   isGeneratePending,
   isEmailPending,
 }) => {
@@ -65,7 +63,20 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
     title: string;
   } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Получаем роли пользователя из localStorage
+  useEffect(() => {
+    try {
+      const roles = localStorage.getItem("userRoles");
+      if (roles) {
+        setUserRoles(JSON.parse(roles));
+      }
+    } catch (error) {
+      console.error("Ошибка при получении ролей пользователя:", error);
+    }
+  }, []);
 
   // Загружаем детальную информацию о заявке при открытии диалога
   const { data: applicationDetail, isLoading: isLoadingDetail } =
@@ -124,16 +135,18 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
     return parts[parts.length - 1] || "document";
   };
 
-  // Проверяем наличие документов (без множественных форм)
+  // Проверяем наличие документов (включая ответ кредитора)
   const hasDocuments =
     applicationDetail &&
-    (applicationDetail.document?.file || applicationDetail.contract?.file);
+    (applicationDetail.document?.file ||
+      applicationDetail.contract?.file ||
+      applicationDetail.creditor_response?.file);
 
   // Собираем все документы в один массив (только одиночные поля, без массивов)
   const getAllDocuments = () => {
     const docs = [];
 
-    // Сгенерированный документ (document - единственное число)
+    // Сгенерированный документ (document)
     if (applicationDetail?.document?.file) {
       docs.push({
         id: `document-${applicationDetail.document.id}`,
@@ -146,7 +159,7 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
       });
     }
 
-    // Договор (contract - единственное число)
+    // Договор (contract)
     if (applicationDetail?.contract?.file) {
       docs.push({
         id: `contract-${applicationDetail.contract.id}`,
@@ -160,10 +173,23 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
       });
     }
 
+    // Ответ кредитора (одиночный) - ТОЛЬКО creditor_response, без массива
+    if (applicationDetail?.creditor_response?.file) {
+      docs.push({
+        id: `creditor-response`,
+        url: applicationDetail.creditor_response.file,
+        title: "Ответ кредитора",
+        subtitle: "Файл ответа",
+        icon: <Building2 className="h-5 w-5 text-purple-600" />,
+        type: "creditor_response",
+      });
+    }
+
     return docs;
   };
 
   const documents = getAllDocuments();
+  const isCreditor = userRoles.includes("creditor");
 
   return (
     <>
@@ -176,9 +202,7 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
               </h3>
               <StatusDropdown
                 currentStatus={application.status}
-                applicationId={application.id}
-                onStatusChange={onStatusChange}
-                isPending={isStatusPending}
+                currentStatusDisplay={application.status_display}
               />
             </div>
             <div className="space-y-1 text-sm text-gray-600">
@@ -299,9 +323,9 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
               </div>
             ) : (
               <div className="space-y-3">
-                {documents.map((doc) => (
+                {documents.map((doc, index) => (
                   <div
-                    key={doc.id}
+                    key={`${doc.id}-${index}`}
                     onClick={() => handleViewDocument(doc.url, doc.title)}
                     className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer border border-gray-200"
                   >
@@ -313,6 +337,11 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
                       {doc.subtitle && (
                         <p className="text-sm text-gray-500 truncate">
                           {doc.subtitle}
+                        </p>
+                      )}
+                      {doc.type === "creditor_response" && (
+                        <p className="text-xs text-purple-600 mt-1">
+                          Ответ кредитора
                         </p>
                       )}
                     </div>
@@ -336,36 +365,38 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
             )}
           </div>
 
-          {/* Нижняя панель с кнопкой загрузки ответа */}
-          <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              className="hidden"
-            />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-2"
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Загрузка...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4" />
-                  Загрузить ответ
-                </>
-              )}
-            </Button>
-            <p className="text-xs text-gray-500 text-center mt-2">
-              Поддерживаемые форматы: PDF, DOC, DOCX, JPG, PNG
-            </p>
-          </div>
+          {/* Нижняя панель с кнопкой загрузки ответа - только для кредиторов */}
+          {isCreditor && (
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                className="hidden"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-2"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Загрузка...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Загрузить ответ
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-gray-500 text-center mt-2">
+                Поддерживаемые форматы: PDF, DOC, DOCX, JPG, PNG
+              </p>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

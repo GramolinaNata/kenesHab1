@@ -11,6 +11,9 @@ import {
   Send,
   MessageSquare,
   Users,
+  FileText,
+  Eye,
+  Download,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,6 +21,7 @@ import * as z from "zod";
 import {
   useProposalAccept,
   useProposalReject,
+  useVacancyDetail,
   useVacancyResponse,
   useVacancyResponses,
 } from "@/features/application/hooks/useApplication";
@@ -105,6 +109,7 @@ interface LawyerResponse {
   fee: string;
   comment: string;
   status: string;
+  status_display: string; // Обязательное поле для отображения
   created_at: string;
 }
 
@@ -119,6 +124,7 @@ export default function LawyerRequestsCard({
 }: LawyerRequestsCardProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isResponseDialogOpen, setIsResponseDialogOpen] = useState(false);
+  const [isDocumentsDialogOpen, setIsDocumentsDialogOpen] = useState(false);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [, setSelectedLawyerId] = useState<number | null>(null);
 
@@ -141,6 +147,14 @@ export default function LawyerRequestsCard({
     request.id,
   );
 
+  // Получаем детальную информацию о вакансии с документами
+  const { data: vacancyDetail, isLoading: isLoadingDetail } = useVacancyDetail(
+    request.id,
+  );
+
+  // Извлекаем документ из детальной информации
+  const document = vacancyDetail?.application?.document;
+
   const responseForm = useForm<ResponseFormValues>({
     resolver: zodResolver(responseFormSchema),
     defaultValues: {
@@ -158,9 +172,12 @@ export default function LawyerRequestsCard({
     });
   };
 
-  const formatTime = (dateString: string) => {
+  const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString("ru-RU", {
+    return date.toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -191,19 +208,6 @@ export default function LawyerRequestsCard({
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getResponseStatusText = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "Ожидает решения";
-      case "accepted":
-        return "Принят";
-      case "rejected":
-        return "Отклонен";
-      default:
-        return status;
     }
   };
 
@@ -276,7 +280,7 @@ export default function LawyerRequestsCard({
   const isLawyer = userRoles.includes("lawyer");
   const isBorrower = userRoles.includes("borrower");
 
-  // Фильтруем отклики для отображения
+  // Фильтруем отклики для отображения (используем status для фильтрации, но отображаем status_display)
   const pendingResponses =
     responses?.filter((r: LawyerResponse) => r.status === "pending") || [];
   const acceptedResponse = responses?.find(
@@ -352,9 +356,35 @@ export default function LawyerRequestsCard({
             </div>
             <div className="flex items-center gap-1">
               <Clock size={14} className="flex-shrink-0" />
-              <span>{formatTime(request.created_at)}</span>
+              <span>{formatDateTime(request.created_at)}</span>
             </div>
           </div>
+
+          {/* Информация о документе (для всех пользователей) */}
+          {document && (
+            <div className="flex items-center gap-2.5 pt-1">
+              <FileText size={16} className="text-[#1f74ec]" />
+              <button
+                onClick={() => setIsDocumentsDialogOpen(true)}
+                className="text-[#1f74ec] text-[11px] sm:text-[12px] font-medium hover:underline flex items-center gap-1"
+                disabled={isLoadingDetail}
+              >
+                {isLoadingDetail ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Загрузка...
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      Документ: {document.template_name || "Без названия"}
+                    </span>
+                    <Eye size={14} />
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           {/* Отклики юристов (для заемщиков) */}
           {isBorrower && responses && responses.length > 0 && (
@@ -377,7 +407,7 @@ export default function LawyerRequestsCard({
                       <span
                         className={`px-2 py-1 rounded-full text-[10px] font-bold w-fit ${getResponseStatusColor(acceptedResponse.status)}`}
                       >
-                        {getResponseStatusText(acceptedResponse.status)}
+                        {acceptedResponse.status_display}
                       </span>
                     </div>
                     <LawyerResponseCard
@@ -449,13 +479,13 @@ export default function LawyerRequestsCard({
                         )?.status || "pending",
                       )}`}
                     >
-                      {getResponseStatusText(
+                      {
                         responses.find(
                           (r: LawyerResponse) =>
                             r.lawyer.id ===
                             JSON.parse(localStorage.getItem("user") || "{}").id,
-                        )?.status || "pending",
-                      )}
+                        )?.status_display
+                      }
                     </span>
                   </div>
                 ) : (
@@ -480,7 +510,7 @@ export default function LawyerRequestsCard({
             <div className="flex items-center gap-2.5">
               <Bookmark color="#1f74ec" size={18} />
               <span className="text-[#68707e] text-[11px] sm:text-[12px]">
-                0 документов
+                {document ? "1 документ" : "0 документов"}
               </span>
             </div>
 
@@ -498,8 +528,6 @@ export default function LawyerRequestsCard({
                   </button>
                 </div>
               )}
-
-              {/* Кнопки "Принять/Отклонить" для заемщиков ТОЛЬКО при статусе in_work */}
 
               {/* Информация о статусе для всех остальных случаев */}
               {!isLawyer && !isBorrower && (
@@ -531,6 +559,93 @@ export default function LawyerRequestsCard({
           </div>
         </div>
       </div>
+
+      {/* Диалог просмотра документа */}
+      <Dialog
+        open={isDocumentsDialogOpen}
+        onOpenChange={setIsDocumentsDialogOpen}
+      >
+        <DialogContent className="sm:max-w-[600px] max-w-[90vw] mx-auto max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              Документ обращения #{request.id}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {isLoadingDetail ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              </div>
+            ) : document ? (
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-start gap-3">
+                  <FileText
+                    size={24}
+                    className="text-blue-600 flex-shrink-0 mt-1"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-base mb-2">
+                      {document.template_name || "Документ"}
+                    </h3>
+
+                    <div className="grid grid-cols-2 gap-2 text-sm mb-4">
+                      <div className="text-gray-600">ID документа:</div>
+                      <div className="font-medium">{document.id}</div>
+
+                      <div className="text-gray-600">Шаблон:</div>
+                      <div className="font-medium">{document.template}</div>
+
+                      <div className="text-gray-600">Подписан:</div>
+                      <div className="font-medium">
+                        {document.signed ? (
+                          <span className="text-green-600">Да</span>
+                        ) : (
+                          <span className="text-yellow-600">Нет</span>
+                        )}
+                      </div>
+
+                      <div className="text-gray-600">Дата загрузки:</div>
+                      <div className="font-medium">
+                        {formatDateTime(document.created_at)}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <a
+                        href={document.file}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Eye size={16} />
+                        Просмотреть
+                      </a>
+                      <a
+                        href={document.file}
+                        download={
+                          document.template_name ||
+                          `document-${document.id}.pdf`
+                        }
+                        className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Download size={16} />
+                        Скачать
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <FileText size={48} className="mx-auto mb-3 opacity-30" />
+                <p>Документ не найден</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Диалог отклика на вакансию (только для юристов) */}
       {isLawyer && (
@@ -683,19 +798,6 @@ function LawyerResponseCard({
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "Ожидает";
-      case "accepted":
-        return "Принят";
-      case "rejected":
-        return "Отклонен";
-      default:
-        return status;
-    }
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("ru-RU", {
@@ -726,7 +828,7 @@ function LawyerResponseCard({
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${getStatusColor(response.status)}`}
             >
-              {getStatusText(response.status)}
+              {response.status_display}
             </span>
           </div>
 
