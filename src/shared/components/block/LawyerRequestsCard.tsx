@@ -14,6 +14,7 @@ import {
   FileText,
   Eye,
   Download,
+  FileSignature,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -109,7 +110,24 @@ interface LawyerResponse {
   fee: string;
   comment: string;
   status: string;
-  status_display: string; // Обязательное поле для отображения
+  status_display: string;
+  created_at: string;
+}
+
+interface Document {
+  id: number;
+  template: number;
+  file: string;
+  template_name: string;
+  signed: boolean;
+  created_at: string;
+}
+
+interface Contract {
+  id: number;
+  number: string;
+  date: string;
+  file: string;
   created_at: string;
 }
 
@@ -125,6 +143,12 @@ export default function LawyerRequestsCard({
   const [actionError, setActionError] = useState<string | null>(null);
   const [isResponseDialogOpen, setIsResponseDialogOpen] = useState(false);
   const [isDocumentsDialogOpen, setIsDocumentsDialogOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<
+    Document | Contract | null
+  >(null);
+  const [documentType, setDocumentType] = useState<"application" | "contract">(
+    "application",
+  );
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [, setSelectedLawyerId] = useState<number | null>(null);
 
@@ -152,8 +176,17 @@ export default function LawyerRequestsCard({
     request.id,
   );
 
-  // Извлекаем документ из детальной информации
-  const document = vacancyDetail?.application?.document;
+  // Извлекаем документы из детальной информации
+  const applicationDocument = vacancyDetail?.application?.document;
+  const contract = vacancyDetail?.application?.contract;
+
+  // Собираем все документы в массив
+  const documents = [
+    ...(applicationDocument
+      ? [{ ...applicationDocument, type: "application" as const }]
+      : []),
+    ...(contract ? [{ ...contract, type: "contract" as const }] : []),
+  ];
 
   const responseForm = useForm<ResponseFormValues>({
     resolver: zodResolver(responseFormSchema),
@@ -271,6 +304,15 @@ export default function LawyerRequestsCard({
     }
   };
 
+  const handleDocumentClick = (
+    doc: Document | Contract,
+    type: "application" | "contract",
+  ) => {
+    setSelectedDocument(doc);
+    setDocumentType(type);
+    setIsDocumentsDialogOpen(true);
+  };
+
   const isPending =
     acceptProposal.isPending ||
     rejectProposal.isPending ||
@@ -280,7 +322,7 @@ export default function LawyerRequestsCard({
   const isLawyer = userRoles.includes("lawyer");
   const isBorrower = userRoles.includes("borrower");
 
-  // Фильтруем отклики для отображения (используем status для фильтрации, но отображаем status_display)
+  // Фильтруем отклики для отображения
   const pendingResponses =
     responses?.filter((r: LawyerResponse) => r.status === "pending") || [];
   const acceptedResponse = responses?.find(
@@ -360,29 +402,77 @@ export default function LawyerRequestsCard({
             </div>
           </div>
 
-          {/* Информация о документе (для всех пользователей) */}
-          {document && (
-            <div className="flex items-center gap-2.5 pt-1">
-              <FileText size={16} className="text-[#1f74ec]" />
-              <button
-                onClick={() => setIsDocumentsDialogOpen(true)}
-                className="text-[#1f74ec] text-[11px] sm:text-[12px] font-medium hover:underline flex items-center gap-1"
-                disabled={isLoadingDetail}
-              >
-                {isLoadingDetail ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    Загрузка...
-                  </>
-                ) : (
-                  <>
-                    <span>
-                      Документ: {document.template_name || "Без названия"}
-                    </span>
-                    <Eye size={14} />
-                  </>
+          {/* Список документов */}
+          {documents.length > 0 && (
+            <div className="pt-1">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText size={16} className="text-[#1f74ec]" />
+                <span className="text-[#23272c] text-[13px] sm:text-[14px] font-semibold">
+                  Документы ({documents.length})
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {/* Документ заявки */}
+                {applicationDocument && (
+                  <button
+                    onClick={() =>
+                      handleDocumentClick(applicationDocument, "application")
+                    }
+                    className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all group"
+                    disabled={isLoadingDetail}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                        <FileSignature size={18} className="text-blue-600" />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <p className="text-[13px] font-medium text-[#23272c] truncate">
+                          {applicationDocument.template_name ||
+                            "Документ заявки"}
+                        </p>
+                        <p className="text-[11px] text-[#68707e]">
+                          Загружен {formatDate(applicationDocument.created_at)}
+                          {applicationDocument.signed && " • Подписан"}
+                        </p>
+                      </div>
+                    </div>
+                    <Eye
+                      size={16}
+                      className="text-[#68707e] group-hover:text-blue-600 flex-shrink-0 ml-2"
+                    />
+                  </button>
                 )}
-              </button>
+
+                {/* Договор */}
+                {contract && (
+                  <button
+                    onClick={() => handleDocumentClick(contract, "contract")}
+                    className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all group"
+                    disabled={isLoadingDetail}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 bg-green-50 rounded-lg group-hover:bg-green-100 transition-colors">
+                        <FileText size={18} className="text-green-600" />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <p className="text-[13px] font-medium text-[#23272c] truncate">
+                          Договор {contract.number ? `№${contract.number}` : ""}
+                        </p>
+                        <p className="text-[11px] text-[#68707e]">
+                          от {formatDate(contract.date)}
+                          {contract.created_at &&
+                            ` • Загружен ${formatDate(contract.created_at)}`}
+                        </p>
+                      </div>
+                    </div>
+                    <Eye
+                      size={16}
+                      className="text-[#68707e] group-hover:text-blue-600 flex-shrink-0 ml-2"
+                    />
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -510,7 +600,7 @@ export default function LawyerRequestsCard({
             <div className="flex items-center gap-2.5">
               <Bookmark color="#1f74ec" size={18} />
               <span className="text-[#68707e] text-[11px] sm:text-[12px]">
-                {document ? "1 документ" : "0 документов"}
+                {documents.length} {getDocumentWord(documents.length)}
               </span>
             </div>
 
@@ -568,8 +658,14 @@ export default function LawyerRequestsCard({
         <DialogContent className="sm:max-w-[600px] max-w-[90vw] mx-auto max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl font-semibold flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-600" />
-              Документ обращения #{request.id}
+              {documentType === "application" ? (
+                <FileSignature className="h-5 w-5 text-blue-600" />
+              ) : (
+                <FileText className="h-5 w-5 text-green-600" />
+              )}
+              {documentType === "application"
+                ? `Документ заявки #${request.id}`
+                : `Договор #${request.id}`}
             </DialogTitle>
           </DialogHeader>
 
@@ -578,43 +674,74 @@ export default function LawyerRequestsCard({
               <div className="flex justify-center items-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
               </div>
-            ) : document ? (
+            ) : selectedDocument ? (
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex items-start gap-3">
-                  <FileText
-                    size={24}
-                    className="text-blue-600 flex-shrink-0 mt-1"
-                  />
+                  {documentType === "application" ? (
+                    <FileSignature
+                      size={24}
+                      className="text-blue-600 flex-shrink-0 mt-1"
+                    />
+                  ) : (
+                    <FileText
+                      size={24}
+                      className="text-green-600 flex-shrink-0 mt-1"
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-base mb-2">
-                      {document.template_name || "Документ"}
+                      {documentType === "application"
+                        ? (selectedDocument as Document).template_name ||
+                          "Документ"
+                        : `Договор ${(selectedDocument as Contract).number ? `№${(selectedDocument as Contract).number}` : ""}`}
                     </h3>
 
                     <div className="grid grid-cols-2 gap-2 text-sm mb-4">
                       <div className="text-gray-600">ID документа:</div>
-                      <div className="font-medium">{document.id}</div>
+                      <div className="font-medium">{selectedDocument.id}</div>
 
-                      <div className="text-gray-600">Шаблон:</div>
-                      <div className="font-medium">{document.template}</div>
+                      {documentType === "application" && (
+                        <>
+                          <div className="text-gray-600">Шаблон:</div>
+                          <div className="font-medium">
+                            {(selectedDocument as Document).template}
+                          </div>
 
-                      <div className="text-gray-600">Подписан:</div>
-                      <div className="font-medium">
-                        {document.signed ? (
-                          <span className="text-green-600">Да</span>
-                        ) : (
-                          <span className="text-yellow-600">Нет</span>
+                          <div className="text-gray-600">Подписан:</div>
+                          <div className="font-medium">
+                            {(selectedDocument as Document).signed ? (
+                              <span className="text-green-600">Да</span>
+                            ) : (
+                              <span className="text-yellow-600">Нет</span>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {documentType === "contract" &&
+                        (selectedDocument as Contract).number && (
+                          <>
+                            <div className="text-gray-600">Номер договора:</div>
+                            <div className="font-medium">
+                              {(selectedDocument as Contract).number}
+                            </div>
+
+                            <div className="text-gray-600">Дата договора:</div>
+                            <div className="font-medium">
+                              {formatDate((selectedDocument as Contract).date)}
+                            </div>
+                          </>
                         )}
-                      </div>
 
                       <div className="text-gray-600">Дата загрузки:</div>
                       <div className="font-medium">
-                        {formatDateTime(document.created_at)}
+                        {formatDateTime(selectedDocument.created_at)}
                       </div>
                     </div>
 
                     <div className="flex gap-3">
                       <a
-                        href={document.file}
+                        href={selectedDocument.file}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
@@ -623,10 +750,12 @@ export default function LawyerRequestsCard({
                         Просмотреть
                       </a>
                       <a
-                        href={document.file}
+                        href={selectedDocument.file}
                         download={
-                          document.template_name ||
-                          `document-${document.id}.pdf`
+                          documentType === "application"
+                            ? (selectedDocument as Document).template_name ||
+                              `document-${selectedDocument.id}.pdf`
+                            : `contract-${(selectedDocument as Contract).number || selectedDocument.id}.pdf`
                         }
                         className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                       >
@@ -764,6 +893,13 @@ export default function LawyerRequestsCard({
       )}
     </>
   );
+}
+
+// Вспомогательная функция для склонения слова "документ"
+function getDocumentWord(count: number): string {
+  if (count === 1) return "документ";
+  if (count >= 2 && count <= 4) return "документа";
+  return "документов";
 }
 
 interface LawyerResponseCardProps {
