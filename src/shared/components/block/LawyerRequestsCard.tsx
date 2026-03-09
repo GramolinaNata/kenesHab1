@@ -150,17 +150,25 @@ export default function LawyerRequestsCard({
     "application",
   );
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [, setSelectedLawyerId] = useState<number | null>(null);
 
-  // Получаем роли пользователя из localStorage
+  // Получаем роли пользователя и email из localStorage
   useEffect(() => {
     try {
       const roles = localStorage.getItem("userRoles");
       if (roles) {
         setUserRoles(JSON.parse(roles));
       }
+
+      // Получаем email текущего пользователя
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setUserEmail(user.email || null);
+      }
     } catch (error) {
-      console.error("Ошибка при получении ролей пользователя:", error);
+      console.error("Ошибка при получении данных пользователя:", error);
     }
   }, []);
 
@@ -321,6 +329,11 @@ export default function LawyerRequestsCard({
   // Проверяем роли
   const isLawyer = userRoles.includes("lawyer");
   const isBorrower = userRoles.includes("borrower");
+
+  // Проверяем, откликался ли текущий юрист по email
+  const hasLawyerResponded = responses?.some(
+    (r: LawyerResponse) => r.lawyer.email === userEmail,
+  );
 
   // Фильтруем отклики для отображения
   const pendingResponses =
@@ -553,27 +566,19 @@ export default function LawyerRequestsCard({
           {isLawyer && responses && (
             <div className="mt-2 pt-2 border-t border-[#cdcbd2]">
               <div className="text-[#68707e] text-[11px] sm:text-[12px]">
-                {responses.some(
-                  (r: LawyerResponse) =>
-                    r.lawyer.id ===
-                    JSON.parse(localStorage.getItem("user") || "{}").id,
-                ) ? (
+                {hasLawyerResponded ? (
                   <div className="flex items-center gap-2">
                     <span className="font-medium">Ваш отклик:</span>
                     <span
                       className={`px-2 py-1 rounded-full text-[10px] font-bold ${getResponseStatusColor(
                         responses.find(
-                          (r: LawyerResponse) =>
-                            r.lawyer.id ===
-                            JSON.parse(localStorage.getItem("user") || "{}").id,
+                          (r: LawyerResponse) => r.lawyer.email === userEmail,
                         )?.status || "pending",
                       )}`}
                     >
                       {
                         responses.find(
-                          (r: LawyerResponse) =>
-                            r.lawyer.id ===
-                            JSON.parse(localStorage.getItem("user") || "{}").id,
+                          (r: LawyerResponse) => r.lawyer.email === userEmail,
                         )?.status_display
                       }
                     </span>
@@ -605,8 +610,8 @@ export default function LawyerRequestsCard({
             </div>
 
             <div className="w-full sm:w-auto">
-              {/* Кнопка "Откликнуться" для юристов ТОЛЬКО при статусе open */}
-              {isLawyer && request.status === "open" && (
+              {/* Кнопка "Откликнуться" для юристов - показываем всегда, если юрист еще не откликался */}
+              {isLawyer && !hasLawyerResponded && (
                 <div className="grid items-center gap-2.5 w-full sm:w-auto">
                   <button
                     onClick={() => setIsResponseDialogOpen(true)}
@@ -619,6 +624,13 @@ export default function LawyerRequestsCard({
                 </div>
               )}
 
+              {/* Сообщение для юриста, который уже откликнулся */}
+              {isLawyer && hasLawyerResponded && (
+                <div className="text-[#68707e] text-[11px] sm:text-[12px] font-medium">
+                  ✓ Вы уже откликнулись
+                </div>
+              )}
+
               {/* Информация о статусе для всех остальных случаев */}
               {!isLawyer && !isBorrower && (
                 <div className="text-[#68707e] text-[11px] sm:text-[12px] font-medium">
@@ -626,8 +638,8 @@ export default function LawyerRequestsCard({
                 </div>
               )}
 
-              {/* Информация для юриста при других статусах */}
-              {isLawyer && request.status !== "open" && (
+              {/* Информация для юриста при других статусах (если не откликался) */}
+              {isLawyer && !hasLawyerResponded && request.status !== "open" && (
                 <div className="text-[#68707e] text-[11px] sm:text-[12px] font-medium">
                   {request.status === "in_work" &&
                     "⏳ Ожидает решения заемщика"}

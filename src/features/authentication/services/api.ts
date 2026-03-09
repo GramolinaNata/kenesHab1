@@ -15,16 +15,20 @@ export const login = async (payload: any): Promise<AuthResponse> => {
 
   const authData = response.data;
 
-
-tokenStore.set({
-  access: authData.tokens.access,
-  refresh: authData.tokens.refresh,
-  roles: authData.user.roles
-});
+  tokenStore.set({
+    access: authData.tokens.access,
+    refresh: authData.tokens.refresh,
+    roles: authData.user.roles,
+    user: {
+      id: authData.user.id,
+      email: authData.user.email,
+      full_name: authData.user.full_name,
+      phone: authData.user.phone,
+    }
+  });
 
   return authData;
 };
-
 // Исправленный вариант
 export const register = async (payload: any): Promise<IResponse<RequestsResponse>> => {
   // Указываем в generic только тип данных (RequestsResponse), 
