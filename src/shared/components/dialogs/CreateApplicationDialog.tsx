@@ -177,21 +177,6 @@ export const CreateApplicationDialog: React.FC<
     return applicationId;
   };
 
-  const handleCreateOnly = async (data: ApplicationFormValues) => {
-    try {
-      setIsUploading(true);
-      setUploadError(null);
-      await createApplicationAndUploadContract(data);
-      resetAndClose();
-    } catch (error) {
-      setUploadError(
-        "Ошибка при создании заявки. Пожалуйста, попробуйте снова.",
-      );
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleCreateAndGenerate = async (data: ApplicationFormValues) => {
     try {
       setIsUploading(true);
@@ -625,13 +610,13 @@ export const CreateApplicationDialog: React.FC<
                     ) : (
                       <>
                         <Eye className="mr-2 h-4 w-4" />
-                        Предпросмотр PDF
+                        Предпросмотр заявки
                       </>
                     )}
                   </Button>
 
                   <div className="flex flex-col gap-2">
-                    <Button
+                    {/* <Button
                       type="button"
                       onClick={createForm.handleSubmit(handleCreateOnly)}
                       disabled={!isFormValid || isUploading || !selectedType}
@@ -645,7 +630,7 @@ export const CreateApplicationDialog: React.FC<
                       ) : (
                         "Создать заявку"
                       )}
-                    </Button>
+                    </Button> */}
 
                     <Button
                       type="button"
@@ -663,7 +648,7 @@ export const CreateApplicationDialog: React.FC<
                       ) : (
                         <>
                           <FileText className="mr-2 h-4 w-4" />
-                          Создать и сгенерировать документ
+                          Создать
                         </>
                       )}
                     </Button>
@@ -687,7 +672,7 @@ export const CreateApplicationDialog: React.FC<
                       ) : (
                         <>
                           <Mail className="mr-2 h-4 w-4" />
-                          Создать и отправить на email
+                          Отправить
                         </>
                       )}
                     </Button>
@@ -749,11 +734,37 @@ export const CreateApplicationDialog: React.FC<
     if (creditors && creditors.length > 0) {
       return creditors.map((creditor) => (
         <SelectItem key={creditor.id} value={creditor.id.toString()}>
-          <div className="flex flex-col">
-            <span>{creditor.name}</span>
-            <span className="text-xs text-gray-500">
-              {creditor.type === "bank" ? "Банк" : "МФО"} • {creditor.email}
-            </span>
+          <div className="flex items-center gap-3">
+            {/* Логотип кредитора */}
+            <div className="flex-shrink-0">
+              {creditor.logo ? (
+                <img
+                  src={creditor.logo}
+                  alt={creditor.name}
+                  className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                  onError={(e) => {
+                    // Если логотип не загрузился, показываем заглушку
+                    e.currentTarget.style.display = "none";
+                    e.currentTarget.nextElementSibling?.classList.remove(
+                      "hidden",
+                    );
+                  }}
+                />
+              ) : null}
+              <div
+                className={`w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm ${creditor.logo ? "hidden" : ""}`}
+              >
+                {creditor.name?.charAt(0).toUpperCase() || "?"}
+              </div>
+            </div>
+
+            {/* Информация о кредиторе */}
+            <div className="flex flex-col">
+              <span className="font-medium">{creditor.name}</span>
+              <span className="text-xs text-gray-500">
+                {creditor.type === "bank" ? "Банк" : "МФО"} • {creditor.email}
+              </span>
+            </div>
           </div>
         </SelectItem>
       ));

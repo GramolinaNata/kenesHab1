@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useProfile,
   useUpdateProfile,
@@ -16,12 +16,11 @@ import {
   MapPin,
   Globe,
   Edit2,
-  Save,
-  X,
   Briefcase,
   Hash,
   Landmark,
   UserCircle,
+  Camera,
 } from "lucide-react";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import { Separator } from "@/shared/components/ui/separator";
@@ -35,6 +34,20 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select";
 import { Badge } from "@/shared/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/shared/components/ui/dialog";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/shared/components/ui/avatar";
 
 type UserRole = "borrower" | "creditor";
 
@@ -55,15 +68,19 @@ interface EditFormData {
   bik?: string;
   iban?: string;
   contact_person?: string;
-  type?: string;
+
+  // Поле для логотипа (будет отправляться как FormData)
+  logo?: File;
 }
 
 export default function Profile() {
-  const { data: userProfile, isLoading } = useProfile();
+  const { data: userProfile, isLoading, refetch } = useProfile();
   const updateProfile = useUpdateProfile();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<EditFormData>({});
+  const [isLogoUploading, setIsLogoUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Определяем роль пользователя
   const userRole: UserRole = userProfile?.user?.roles?.includes("creditor")
@@ -88,7 +105,6 @@ export default function Profile() {
           iban: userProfile.profile.iban || "",
           address: userProfile.profile.address || "",
           contact_person: userProfile.profile.contact_person || "",
-          type: userProfile.profile.type || "mfo",
         });
       }
     }
@@ -127,11 +143,40 @@ export default function Profile() {
           iban: userProfile.profile.iban || "",
           address: userProfile.profile.address || "",
           contact_person: userProfile.profile.contact_person || "",
-          type: userProfile.profile.type || "mfo",
         });
       }
     }
     setIsEditing(false);
+  };
+
+  const handleLogoUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Проверка размера файла (макс 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return;
+    }
+
+    // Проверка типа файла
+    if (!file.type.startsWith("image/")) {
+      return;
+    }
+
+    setIsLogoUploading(true);
+    try {
+      // Используем тот же хук updateProfile для загрузки логотипа
+      await updateProfile.mutateAsync({ logo: file });
+      await refetch();
+    } catch (error) {
+    } finally {
+      setIsLogoUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   const getRoleBadge = () => {
@@ -145,12 +190,45 @@ export default function Profile() {
     }
   };
 
+  const getInitials = () => {
+    if (userRole === "borrower") {
+      const fullName =
+        userProfile?.profile?.full_name || userProfile?.user?.first_name || "";
+      return fullName
+        .split(" ")
+        .map((word: any) => word[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    } else {
+      const name = userProfile?.profile?.name || "";
+      return name
+        .split(" ")
+        .map((word: any) => word[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    }
+  };
+
+  // Форматирование даты из ISO в локальный формат
+  const formatDate = (isoDate: string) => {
+    if (!isoDate) return "Не указано";
+    const date = new Date(isoDate);
+    return date.toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         <div className="space-y-8">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-32 w-32 rounded-full mx-auto" />
+          <Skeleton className="h-10 w-64 mx-auto" />
+          <Skeleton className="h-6 w-48 mx-auto" />
           <div className="space-y-6">
             <Skeleton className="h-40 w-full" />
             <Skeleton className="h-40 w-full" />
@@ -164,9 +242,6 @@ export default function Profile() {
   const user = userProfile?.user;
   const profile = userProfile?.profile;
 
-  // Форматирование даты регистрации
-  const registrationDate = "12/12/28"; // Замените на реальное поле, когда появится в API
-
   // Форматирование телефона
   const formatPhone = (phone: string) => {
     if (!phone) return "Не указан";
@@ -178,101 +253,249 @@ export default function Profile() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
+      {/* Аватар/Логотип */}
+      <div className="flex flex-col items-center mb-8">
+        <div className="relative group">
+          <Avatar className="h-32 w-32 border-4 border-white shadow-lg">
+            <AvatarImage
+              src={profile?.logo || profile?.avatar_url}
+              alt="Avatar"
+              className="object-cover"
+            />
+            <AvatarFallback className="text-3xl bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+              {getInitials()}
+            </AvatarFallback>
+          </Avatar>
+
+          {/* Кнопки управления для кредитора */}
+          {userRole === "creditor" && (
+            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="rounded-full h-8 w-8 p-0 shadow-lg"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLogoUploading || updateProfile.isPending}
+              >
+                <Camera className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Скрытый input для загрузки файла */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          accept="image/*"
+          onChange={handleLogoUpload}
+        />
+
+        {userRole === "creditor" && (
+          <p className="text-sm text-gray-500 mt-4">
+            {profile?.logo
+              ? "Нажмите на камеру чтобы изменить логотип"
+              : "Добавьте логотип организации"}
+          </p>
+        )}
+      </div>
+
       {/* Заголовок с основной информацией */}
       <div className="mb-10 flex justify-between items-start">
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900">
-              {isEditing ? (
-                userRole === "borrower" ? (
-                  <Input
-                    name="full_name"
-                    value={editForm.full_name || ""}
-                    onChange={handleInputChange}
-                    placeholder="Введите ФИО"
-                    className="text-2xl font-bold h-auto py-1 px-2"
-                  />
-                ) : (
-                  <Input
-                    name="name"
-                    value={editForm.name || ""}
-                    onChange={handleInputChange}
-                    placeholder="Введите название организации"
-                    className="text-2xl font-bold h-auto py-1 px-2"
-                  />
-                )
-              ) : userRole === "borrower" ? (
-                profile?.full_name || user?.first_name || "ФИО не указано"
-              ) : (
-                profile?.name || "Название организации не указано"
-              )}
+              {userRole === "borrower"
+                ? profile?.full_name || user?.first_name || "ФИО не указано"
+                : profile?.name || "Название организации не указано"}
             </h1>
             {getRoleBadge()}
           </div>
 
           <div className="text-lg text-gray-600 font-medium">
-            {isEditing ? (
-              userRole === "borrower" ? (
-                <Input
-                  name="iin"
-                  value={editForm.iin || ""}
-                  onChange={handleInputChange}
-                  placeholder="Введите ИИН"
-                  className="text-lg h-auto py-1 px-2"
-                  maxLength={12}
-                />
-              ) : (
-                <Input
-                  name="bin_iin"
-                  value={editForm.bin_iin || ""}
-                  onChange={handleInputChange}
-                  placeholder="Введите БИН/ИИН"
-                  className="text-lg h-auto py-1 px-2"
-                  maxLength={12}
-                />
-              )
-            ) : userRole === "borrower" ? (
-              profile?.iin || "ИИН не указан"
-            ) : (
-              profile?.bin_iin || "БИН/ИИН не указан"
-            )}
+            {userRole === "borrower"
+              ? profile?.iin || "ИИН не указан"
+              : profile?.bin_iin || "БИН/ИИН не указан"}
           </div>
         </div>
 
-        {!isEditing ? (
-          <Button
-            onClick={() => setIsEditing(true)}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <Edit2 className="h-4 w-4" />
-            Редактировать
-          </Button>
-        ) : (
-          <div className="flex gap-2">
+        <Dialog open={isEditing} onOpenChange={setIsEditing}>
+          <DialogTrigger asChild>
             <Button
-              onClick={handleSave}
-              variant="default"
-              size="sm"
-              className="flex items-center gap-2"
-              disabled={updateProfile.isPending}
-            >
-              <Save className="h-4 w-4" />
-              {updateProfile.isPending ? "Сохранение..." : "Сохранить"}
-            </Button>
-            <Button
-              onClick={handleCancel}
               variant="outline"
               size="sm"
               className="flex items-center gap-2"
-              disabled={updateProfile.isPending}
             >
-              <X className="h-4 w-4" />
-              Отмена
+              <Edit2 className="h-4 w-4" />
+              Редактировать
             </Button>
-          </div>
-        )}
+          </DialogTrigger>
+
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {userRole === "borrower"
+                  ? "Редактирование профиля"
+                  : "Редактирование организации"}
+              </DialogTitle>
+              <DialogDescription>
+                {userRole === "borrower"
+                  ? "Измените ваши личные данные ниже"
+                  : "Измените информацию об организации ниже"}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+              {/* Основная информация */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Основная информация</h3>
+
+                {userRole === "borrower" ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">ФИО</label>
+                      <Input
+                        name="full_name"
+                        value={editForm.full_name || ""}
+                        onChange={handleInputChange}
+                        placeholder="Введите ФИО"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">ИИН</label>
+                      <Input
+                        name="iin"
+                        value={editForm.iin || ""}
+                        onChange={handleInputChange}
+                        placeholder="Введите ИИН"
+                        maxLength={12}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Название организации
+                      </label>
+                      <Input
+                        name="name"
+                        value={editForm.name || ""}
+                        onChange={handleInputChange}
+                        placeholder="Введите название организации"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">БИН/ИИН</label>
+                      <Input
+                        name="bin_iin"
+                        value={editForm.bin_iin || ""}
+                        onChange={handleInputChange}
+                        placeholder="Введите БИН/ИИН"
+                        maxLength={12}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Адрес</label>
+                  <Input
+                    name="address"
+                    value={editForm.address || ""}
+                    onChange={handleInputChange}
+                    placeholder="Введите адрес"
+                  />
+                </div>
+              </div>
+
+              {/* Банковские реквизиты для кредитора */}
+              {userRole === "creditor" && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Банковские реквизиты</h3>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">БИК</label>
+                    <Input
+                      name="bik"
+                      value={editForm.bik || ""}
+                      onChange={handleInputChange}
+                      placeholder="Введите БИК"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">IBAN</label>
+                    <Input
+                      name="iban"
+                      value={editForm.iban || ""}
+                      onChange={handleInputChange}
+                      placeholder="Введите IBAN"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Контактное лицо
+                    </label>
+                    <Input
+                      name="contact_person"
+                      value={editForm.contact_person || ""}
+                      onChange={handleInputChange}
+                      placeholder="Введите ФИО контактного лица"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Предпочитаемый язык для borrower */}
+              {userRole === "borrower" && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Настройки</h3>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Предпочитаемый язык
+                    </label>
+                    <Select
+                      value={editForm.preferred_lang}
+                      onValueChange={(value) =>
+                        handleSelectChange("preferred_lang", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите язык" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ru">Русский</SelectItem>
+                        <SelectItem value="kk">Қазақша</SelectItem>
+                        <SelectItem value="en">English</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={handleCancel}
+                disabled={updateProfile.isPending}
+              >
+                Отмена
+              </Button>
+              <Button onClick={handleSave} disabled={updateProfile.isPending}>
+                {updateProfile.isPending
+                  ? "Сохранение..."
+                  : "Сохранить изменения"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Раздел: Основная информация */}
@@ -304,7 +527,7 @@ export default function Profile() {
                 ДАТА РЕГИСТРАЦИИ
               </div>
               <div className="text-lg font-medium text-gray-900">
-                {registrationDate}
+                {formatDate(profile?.created_at)}
               </div>
             </div>
 
@@ -337,30 +560,12 @@ export default function Profile() {
                   <Briefcase className="h-4 w-4" />
                   ТИП ОРГАНИЗАЦИИ
                 </div>
-                {isEditing ? (
-                  <Select
-                    value={editForm.type}
-                    onValueChange={(value) => handleSelectChange("type", value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Выберите тип" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mfo">
-                        Микрофинансовая организация
-                      </SelectItem>
-                      <SelectItem value="bank">Банк</SelectItem>
-                      <SelectItem value="other">Другое</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="text-lg font-medium text-gray-900">
-                    {profile?.type === "mfo" && "Микрофинансовая организация"}
-                    {profile?.type === "bank" && "Банк"}
-                    {profile?.type === "other" && "Другое"}
-                    {!profile?.type && "Не указан"}
-                  </div>
-                )}
+                <div className="text-lg font-medium text-gray-900">
+                  {profile?.type === "mfo" && "Микрофинансовая организация"}
+                  {profile?.type === "bank" && "Банк"}
+                  {profile?.type === "other" && "Другое"}
+                  {!profile?.type && "Не указан"}
+                </div>
               </div>
 
               <div>
@@ -368,19 +573,9 @@ export default function Profile() {
                   <Hash className="h-4 w-4" />
                   БИК
                 </div>
-                {isEditing ? (
-                  <Input
-                    name="bik"
-                    value={editForm.bik || ""}
-                    onChange={handleInputChange}
-                    placeholder="Введите БИК"
-                    className="text-lg"
-                  />
-                ) : (
-                  <div className="text-lg font-medium text-gray-900">
-                    {profile?.bik || "БИК не указан"}
-                  </div>
-                )}
+                <div className="text-lg font-medium text-gray-900">
+                  {profile?.bik || "БИК не указан"}
+                </div>
               </div>
 
               <div>
@@ -388,19 +583,9 @@ export default function Profile() {
                   <Landmark className="h-4 w-4" />
                   IBAN
                 </div>
-                {isEditing ? (
-                  <Input
-                    name="iban"
-                    value={editForm.iban || ""}
-                    onChange={handleInputChange}
-                    placeholder="Введите IBAN"
-                    className="text-lg"
-                  />
-                ) : (
-                  <div className="text-lg font-medium text-gray-900">
-                    {profile?.iban || "IBAN не указан"}
-                  </div>
-                )}
+                <div className="text-lg font-medium text-gray-900">
+                  {profile?.iban || "IBAN не указан"}
+                </div>
               </div>
 
               <div>
@@ -408,19 +593,9 @@ export default function Profile() {
                   <UserCircle className="h-4 w-4" />
                   КОНТАКТНОЕ ЛИЦО
                 </div>
-                {isEditing ? (
-                  <Input
-                    name="contact_person"
-                    value={editForm.contact_person || ""}
-                    onChange={handleInputChange}
-                    placeholder="Введите ФИО контактного лица"
-                    className="text-lg"
-                  />
-                ) : (
-                  <div className="text-lg font-medium text-gray-900">
-                    {profile?.contact_person || "Не указано"}
-                  </div>
-                )}
+                <div className="text-lg font-medium text-gray-900">
+                  {profile?.contact_person || "Не указано"}
+                </div>
               </div>
             </>
           )}
@@ -431,19 +606,9 @@ export default function Profile() {
               <MapPin className="h-4 w-4" />
               АДРЕС
             </div>
-            {isEditing ? (
-              <Input
-                name="address"
-                value={editForm.address || ""}
-                onChange={handleInputChange}
-                placeholder="Введите адрес"
-                className="text-lg"
-              />
-            ) : (
-              <div className="text-lg font-medium text-gray-900">
-                {profile?.address || "Адрес не указан"}
-              </div>
-            )}
+            <div className="text-lg font-medium text-gray-900">
+              {profile?.address || "Адрес не указан"}
+            </div>
           </div>
 
           {/* Предпочитаемый язык (только для borrower) */}
@@ -453,30 +618,12 @@ export default function Profile() {
                 <Globe className="h-4 w-4" />
                 ПРЕДПОЧИТАЕМЫЙ ЯЗЫК
               </div>
-              {isEditing ? (
-                <Select
-                  value={editForm.preferred_lang}
-                  onValueChange={(value) =>
-                    handleSelectChange("preferred_lang", value)
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Выберите язык" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ru">Русский</SelectItem>
-                    <SelectItem value="kk">Қазақша</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="text-lg font-medium text-gray-900">
-                  {profile?.preferred_lang === "ru" && "Русский"}
-                  {profile?.preferred_lang === "kk" && "Қазақша"}
-                  {profile?.preferred_lang === "en" && "English"}
-                  {!profile?.preferred_lang && "Не указан"}
-                </div>
-              )}
+              <div className="text-lg font-medium text-gray-900">
+                {profile?.preferred_lang === "ru" && "Русский"}
+                {profile?.preferred_lang === "kk" && "Қазақша"}
+                {profile?.preferred_lang === "en" && "English"}
+                {!profile?.preferred_lang && "Не указан"}
+              </div>
             </div>
           )}
         </div>

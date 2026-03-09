@@ -12,6 +12,7 @@ import {
   Loader2,
   X,
   Building2,
+  User,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -29,13 +30,15 @@ import {
   DialogClose,
 } from "@/shared/components/ui/dialog";
 import { StatusDropdown } from "./StatusDropdown";
-import {
-  formatDate,
-  getCreditorName,
-} from "@/features/application/utils/application";
+import { formatDate } from "@/features/application/utils/application";
 import { useApplicationDetail } from "@/features/application/hooks/useApplication";
 import { useApplicationUploadResponse } from "@/features/application/hooks/useApplication";
 import { DocumentPreviewDialog } from "@/shared/components/dialogs/DocumentPreviewDialog";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/shared/components/ui/avatar";
 
 interface ApplicationCardProps {
   application: any;
@@ -53,7 +56,6 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
   onDelete,
   onGenerateDocument,
   onSendEmail,
-
   isGeneratePending,
   isEmailPending,
 }) => {
@@ -190,12 +192,24 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
 
   const documents = getAllDocuments();
   const isCreditor = userRoles.includes("creditor");
+  const isBorrower = userRoles.includes("borrower");
+
+  // Получаем инициалы для аватара
+  const getInitials = (name: string) => {
+    if (!name) return "?";
+    return name
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
     <>
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
         <div className="flex justify-between items-start">
-          <div>
+          <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <h3 className="font-semibold text-gray-900">
                 Заявка #{application.id.slice(0, 8)}
@@ -205,27 +219,73 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
                 currentStatusDisplay={application.status_display}
               />
             </div>
-            <div className="space-y-1 text-sm text-gray-600">
-              <p className="flex items-center gap-1">
-                <span className="font-medium">Кредитор:</span>
-                {getCreditorName(application.creditor)}
-              </p>
-              <p className="flex items-center gap-1">
-                <span className="font-medium">Сумма:</span>
-                {parseFloat(application.amount).toLocaleString("ru-RU")} ₸
-              </p>
-              <p className="flex items-center gap-1">
-                <span className="font-medium">Создана:</span>
-                {formatDate(application.created_at)}
-              </p>
-              {application.bank_email && (
+
+            {/* Информация о кредиторе/заемщике в зависимости от роли */}
+            <div className="space-y-2 text-sm text-gray-600">
+              {isBorrower ? (
+                // Для заемщика показываем информацию о кредиторе с логотипом
+                <div className="flex items-center gap-2 mb-2">
+                  <Avatar className="h-8 w-8 border border-gray-200">
+                    <AvatarImage
+                      src={application.creditor?.logo}
+                      alt={application.creditor?.name}
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
+                      {getInitials(application.creditor?.name || "К")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-xs text-gray-500">Кредитор</p>
+                    <p className="font-medium text-gray-900">
+                      {application.creditor?.name || "Не указан"}
+                    </p>
+                  </div>
+                </div>
+              ) : isCreditor ? (
+                // Для кредитора показываем информацию о заемщике
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                    <User className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Заемщик</p>
+                    <p className="font-medium text-gray-900">
+                      {application.borrower?.full_name || "Не указан"}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-2 gap-2 mt-2">
                 <p className="flex items-center gap-1">
-                  <span className="font-medium">Email:</span>
-                  {application.bank_email}
+                  <span className="font-medium">Сумма:</span>
+                  {parseFloat(application.amount).toLocaleString("ru-RU")} ₸
+                </p>
+                <p className="flex items-center gap-1">
+                  <span className="font-medium">Создана:</span>
+                  {formatDate(application.created_at)}
+                </p>
+              </div>
+
+              {/* Дополнительная информация о кредиторе для заемщика */}
+              {isBorrower && application.creditor?.email && (
+                <p className="flex items-center gap-1 text-xs text-gray-500">
+                  <Mail className="h-3 w-3" />
+                  {application.creditor.email}
+                </p>
+              )}
+
+              {/* Дополнительная информация о заемщике для кредитора */}
+              {isCreditor && application.borrower?.phone && (
+                <p className="flex items-center gap-1 text-xs text-gray-500">
+                  <span className="font-medium">Тел.:</span>
+                  {application.borrower.phone}
                 </p>
               )}
             </div>
           </div>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
