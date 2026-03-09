@@ -27,6 +27,7 @@ import {
 } from "../lib/route";
 
 import { ProtectedRoute, AuthRoute } from "../components/ProtectedRoute";
+import ApplicationId from "@/pages/main/application/id/application";
 
 export const routes: RouteObject[] = [
   {
@@ -56,6 +57,7 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <Home /> },
           { path: "profile", element: <Profile /> },
+          { path: "application/:id", element: <ApplicationId /> },
         ],
       },
       {

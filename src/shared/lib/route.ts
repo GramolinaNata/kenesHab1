@@ -10,6 +10,7 @@ export const RegisterLawyer = lazy(() => import("../../pages/auth/register/lawye
 // Main компоненты
 export const Home = lazy(() => import("../../pages/main/home/home"));
 export const Profile = lazy(() => import("../../pages/main/profile/profile"));
+export const ApplicationId = lazy(() => import("../../pages/main/application/id/application"));
 
 //Detali Компоненты
 export const CreateStatment = lazy(() => import("../../pages/detali/statement/create-statement"));
