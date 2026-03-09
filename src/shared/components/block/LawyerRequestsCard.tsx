@@ -114,23 +114,6 @@ interface LawyerResponse {
   created_at: string;
 }
 
-interface Document {
-  id: number;
-  template: number;
-  file: string;
-  template_name: string;
-  signed: boolean;
-  created_at: string;
-}
-
-interface Contract {
-  id: number;
-  number: string;
-  date: string;
-  file: string;
-  created_at: string;
-}
-
 interface LawyerRequestsCardProps {
   request: LawyerRequest;
   onStatusChange?: () => void;
@@ -143,12 +126,14 @@ export default function LawyerRequestsCard({
   const [actionError, setActionError] = useState<string | null>(null);
   const [isResponseDialogOpen, setIsResponseDialogOpen] = useState(false);
   const [isDocumentsDialogOpen, setIsDocumentsDialogOpen] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<
-    Document | Contract | null
-  >(null);
-  const [documentType, setDocumentType] = useState<"application" | "contract">(
-    "application",
-  );
+  const [selectedDocument, setSelectedDocument] = useState<{
+    url: string;
+    title: string;
+    type: "application" | "contract" | "response";
+  }>({ url: "", title: "", type: "application" });
+  const [documentType, setDocumentType] = useState<
+    "application" | "contract" | "response"
+  >("application");
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [, setSelectedLawyerId] = useState<number | null>(null);
@@ -187,6 +172,7 @@ export default function LawyerRequestsCard({
   // Извлекаем документы из детальной информации
   const applicationDocument = vacancyDetail?.application?.document;
   const contract = vacancyDetail?.application?.contract;
+  const creditorResponse = vacancyDetail?.application?.creditor_response;
 
   // Собираем все документы в массив
   const documents = [
@@ -194,6 +180,9 @@ export default function LawyerRequestsCard({
       ? [{ ...applicationDocument, type: "application" as const }]
       : []),
     ...(contract ? [{ ...contract, type: "contract" as const }] : []),
+    ...(creditorResponse
+      ? [{ file: creditorResponse.file, type: "response" as const }]
+      : []),
   ];
 
   const responseForm = useForm<ResponseFormValues>({
@@ -205,6 +194,7 @@ export default function LawyerRequestsCard({
   });
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "Не указано";
     const date = new Date(dateString);
     return date.toLocaleDateString("ru-RU", {
       day: "2-digit",
@@ -214,6 +204,7 @@ export default function LawyerRequestsCard({
   };
 
   const formatDateTime = (dateString: string) => {
+    if (!dateString) return "Не указано";
     const date = new Date(dateString);
     return date.toLocaleDateString("ru-RU", {
       day: "2-digit",
@@ -313,10 +304,11 @@ export default function LawyerRequestsCard({
   };
 
   const handleDocumentClick = (
-    doc: Document | Contract,
-    type: "application" | "contract",
+    doc: any,
+    type: "application" | "contract" | "response",
+    title: string,
   ) => {
-    setSelectedDocument(doc);
+    setSelectedDocument({ url: doc.file, title, type });
     setDocumentType(type);
     setIsDocumentsDialogOpen(true);
   };
@@ -430,7 +422,11 @@ export default function LawyerRequestsCard({
                 {applicationDocument && (
                   <button
                     onClick={() =>
-                      handleDocumentClick(applicationDocument, "application")
+                      handleDocumentClick(
+                        applicationDocument,
+                        "application",
+                        applicationDocument.template_name,
+                      )
                     }
                     className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all group"
                     disabled={isLoadingDetail}
@@ -460,8 +456,14 @@ export default function LawyerRequestsCard({
                 {/* Договор */}
                 {contract && (
                   <button
-                    onClick={() => handleDocumentClick(contract, "contract")}
-                    className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all group"
+                    onClick={() =>
+                      handleDocumentClick(
+                        contract,
+                        "contract",
+                        `Договор ${contract.number ? `№${contract.number}` : ""}`,
+                      )
+                    }
+                    className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-green-300 hover:shadow-sm transition-all group"
                     disabled={isLoadingDetail}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -481,7 +483,40 @@ export default function LawyerRequestsCard({
                     </div>
                     <Eye
                       size={16}
-                      className="text-[#68707e] group-hover:text-blue-600 flex-shrink-0 ml-2"
+                      className="text-[#68707e] group-hover:text-green-600 flex-shrink-0 ml-2"
+                    />
+                  </button>
+                )}
+
+                {/* Ответ кредитора */}
+                {creditorResponse && (
+                  <button
+                    onClick={() =>
+                      handleDocumentClick(
+                        creditorResponse,
+                        "response",
+                        "Ответ кредитора",
+                      )
+                    }
+                    className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-purple-300 hover:shadow-sm transition-all group"
+                    disabled={isLoadingDetail}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 bg-purple-50 rounded-lg group-hover:bg-purple-100 transition-colors">
+                        <FileText size={18} className="text-purple-600" />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <p className="text-[13px] font-medium text-[#23272c] truncate">
+                          Ответ кредитора
+                        </p>
+                        <p className="text-[11px] text-purple-600">
+                          Файл ответа
+                        </p>
+                      </div>
+                    </div>
+                    <Eye
+                      size={16}
+                      className="text-[#68707e] group-hover:text-purple-600 flex-shrink-0 ml-2"
                     />
                   </button>
                 )}
@@ -672,12 +707,12 @@ export default function LawyerRequestsCard({
             <DialogTitle className="text-lg sm:text-xl font-semibold flex items-center gap-2">
               {documentType === "application" ? (
                 <FileSignature className="h-5 w-5 text-blue-600" />
-              ) : (
+              ) : documentType === "contract" ? (
                 <FileText className="h-5 w-5 text-green-600" />
+              ) : (
+                <FileText className="h-5 w-5 text-purple-600" />
               )}
-              {documentType === "application"
-                ? `Документ заявки #${request.id}`
-                : `Договор #${request.id}`}
+              {selectedDocument?.title || "Документ"}
             </DialogTitle>
           </DialogHeader>
 
@@ -694,66 +729,25 @@ export default function LawyerRequestsCard({
                       size={24}
                       className="text-blue-600 flex-shrink-0 mt-1"
                     />
-                  ) : (
+                  ) : documentType === "contract" ? (
                     <FileText
                       size={24}
                       className="text-green-600 flex-shrink-0 mt-1"
                     />
+                  ) : (
+                    <FileText
+                      size={24}
+                      className="text-purple-600 flex-shrink-0 mt-1"
+                    />
                   )}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-base mb-2">
-                      {documentType === "application"
-                        ? (selectedDocument as Document).template_name ||
-                          "Документ"
-                        : `Договор ${(selectedDocument as Contract).number ? `№${(selectedDocument as Contract).number}` : ""}`}
+                    <h3 className="font-medium text-base mb-4">
+                      {selectedDocument.title}
                     </h3>
-
-                    <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                      <div className="text-gray-600">ID документа:</div>
-                      <div className="font-medium">{selectedDocument.id}</div>
-
-                      {documentType === "application" && (
-                        <>
-                          <div className="text-gray-600">Шаблон:</div>
-                          <div className="font-medium">
-                            {(selectedDocument as Document).template}
-                          </div>
-
-                          <div className="text-gray-600">Подписан:</div>
-                          <div className="font-medium">
-                            {(selectedDocument as Document).signed ? (
-                              <span className="text-green-600">Да</span>
-                            ) : (
-                              <span className="text-yellow-600">Нет</span>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      {documentType === "contract" &&
-                        (selectedDocument as Contract).number && (
-                          <>
-                            <div className="text-gray-600">Номер договора:</div>
-                            <div className="font-medium">
-                              {(selectedDocument as Contract).number}
-                            </div>
-
-                            <div className="text-gray-600">Дата договора:</div>
-                            <div className="font-medium">
-                              {formatDate((selectedDocument as Contract).date)}
-                            </div>
-                          </>
-                        )}
-
-                      <div className="text-gray-600">Дата загрузки:</div>
-                      <div className="font-medium">
-                        {formatDateTime(selectedDocument.created_at)}
-                      </div>
-                    </div>
 
                     <div className="flex gap-3">
                       <a
-                        href={selectedDocument.file}
+                        href={selectedDocument.url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
@@ -762,12 +756,9 @@ export default function LawyerRequestsCard({
                         Просмотреть
                       </a>
                       <a
-                        href={selectedDocument.file}
+                        href={selectedDocument.url}
                         download={
-                          documentType === "application"
-                            ? (selectedDocument as Document).template_name ||
-                              `document-${selectedDocument.id}.pdf`
-                            : `contract-${(selectedDocument as Contract).number || selectedDocument.id}.pdf`
+                          selectedDocument.url.split("/").pop() || "document"
                         }
                         className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                       >

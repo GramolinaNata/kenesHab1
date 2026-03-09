@@ -24,6 +24,7 @@ import {
   Profile,
   RegisterCreditor,
   RegisterLawyer,
+  Lawyer,
 } from "../lib/route";
 
 import { ProtectedRoute, AuthRoute } from "../components/ProtectedRoute";
@@ -58,6 +59,7 @@ export const routes: RouteObject[] = [
           { index: true, element: <Home /> },
           { path: "profile", element: <Profile /> },
           { path: "application/:id", element: <ApplicationId /> },
+          { path: "lawyer", element: <Lawyer /> },
         ],
       },
       {

@@ -14,6 +14,7 @@ import {
   XCircle,
   Menu,
   Loader2,
+  Briefcase, // Добавлена иконка для обращений
 } from "lucide-react";
 import { useAi } from "@/features/ui/hook/useAi";
 
@@ -29,6 +30,7 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "1",
@@ -42,6 +44,18 @@ export default function MainLayout() {
   ]);
   const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Получаем роли пользователя из localStorage при загрузке
+  useEffect(() => {
+    try {
+      const roles = localStorage.getItem("userRoles");
+      if (roles) {
+        setUserRoles(JSON.parse(roles));
+      }
+    } catch (error) {
+      console.error("Ошибка при получении ролей пользователя:", error);
+    }
+  }, []);
 
   // Подготавливаем данные для отправки
   const [aiQueryData, setAiQueryData] = useState<{
@@ -150,6 +164,9 @@ export default function MainLayout() {
     navigate("/auth/login");
   };
 
+  // Проверяем, есть ли роль lawyer
+  const isLawyer = userRoles.includes("lawyer");
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {/* Header */}
@@ -164,14 +181,6 @@ export default function MainLayout() {
             </button>
             <img src="/logo.png" alt="" />
           </div>
-
-          {/* <div className="flex items-center gap-2">
-            <button className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 active:bg-gray-100">
-              <div className="w-2 h-2 bg-red-500 rounded-full absolute top-2 right-2"></div>
-              <div className="w-5 h-5 bg-gray-400 rounded"></div>
-            </button>
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-200 to-pink-200 rounded-full"></div>
-          </div> */}
         </div>
       </header>
 
@@ -240,6 +249,16 @@ export default function MainLayout() {
                     href="/requests"
                     onClick={() => setOpen(false)}
                   />
+
+                  {/* Пункт "Мои обращения" только для юристов */}
+                  {isLawyer && (
+                    <MenuItem
+                      icon={Briefcase}
+                      label="Мои обращения"
+                      href="/lawyer"
+                      onClick={() => setOpen(false)}
+                    />
+                  )}
                 </div>
               </nav>
 

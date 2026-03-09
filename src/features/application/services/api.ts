@@ -100,3 +100,7 @@ export const GetVacancyResponses = (id: number) => {
 export const GetVacancyDetail = (id: number) => {
   return clientApi.get(`/api/vacancy/${id}/`);
 };
+
+export const GetProposals = () => {
+  return clientApi.get("/api/proposal/");
+};

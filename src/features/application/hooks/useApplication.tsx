@@ -24,6 +24,7 @@ import {
   UploadApplicationResponse,
   GetVacancyResponses,
   GetVacancyDetail,
+  GetProposals,
 } from "../services/api";
 import type { QueryParams } from "../types/payload";
 
@@ -501,5 +502,24 @@ export const useVacancyDetail = (id: number | undefined) => {
     },
     enabled: !!id, // Запрос не уйдет, если id не передан (например, пока роут не загрузился)
     staleTime: 1000 * 60 * 5, // Данные считаются свежими 5 минут
+  });
+};
+
+export const useProposals = () => {
+  return useQuery({
+    queryKey: ["Proposals"],
+    queryFn: async () => {
+      const response = await GetProposals();
+
+      if (!response.success) {
+        throw new Error(
+          response.error?.detail ||
+            response.error ||
+            "Ошибка при получении списка предложений",
+        );
+      }
+
+      return response.data;
+    },
   });
 };
