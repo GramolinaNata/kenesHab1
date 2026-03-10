@@ -5,7 +5,6 @@ import {
   FileText,
   Mail,
   Trash2,
-  Eye,
   FileDown,
   File,
   Upload,
@@ -45,20 +44,20 @@ interface ApplicationCardProps {
   application: any;
   onEdit: (app: any) => void;
   onDelete: (app: any) => void;
-  onGenerateDocument: (app: any) => void;
-  onSendEmail: (app: any) => void;
-  isGeneratePending: boolean;
-  isEmailPending: boolean;
+  // onGenerateDocument: (app: any) => void;
+  // onSendEmail: (app: any) => void;
+  // isGeneratePending: boolean;
+  // isEmailPending: boolean;
 }
 
 export const ApplicationCard: React.FC<ApplicationCardProps> = ({
   application,
   onEdit,
   onDelete,
-  onGenerateDocument,
-  onSendEmail,
-  isGeneratePending,
-  isEmailPending,
+  // onGenerateDocument,
+  // onSendEmail,
+  // isGeneratePending,
+  // isEmailPending,
 }) => {
   const [isDocumentsDialogOpen, setIsDocumentsDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<{
@@ -332,7 +331,7 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
                 Редактировать
               </DropdownMenuItem>
 
-              <DropdownMenuItem
+              {/* <DropdownMenuItem
                 onClick={() => setIsDocumentsDialogOpen(true)}
                 className="flex items-center gap-2 cursor-pointer"
               >
@@ -355,7 +354,7 @@ export const ApplicationCard: React.FC<ApplicationCardProps> = ({
               >
                 <Mail className="h-4 w-4" />
                 Отправить на email
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => onDelete(application)}

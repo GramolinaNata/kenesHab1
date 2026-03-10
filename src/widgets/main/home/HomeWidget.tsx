@@ -528,21 +528,21 @@ export default function HomeWidget() {
                   application={application}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
-                  onGenerateDocument={(app) => {
-                    setSelectedApplication(app);
-                    setIsDocumentDialogOpen(true);
-                  }}
-                  onSendEmail={(app) => {
-                    setSelectedApplication(app);
-                    setIsEmailDialogOpen(true);
-                  }}
-                  isGeneratePending={generateDocument.isPending}
-                  isEmailPending={
-                    generateDocument.isPending ||
-                    sendOtp.isPending ||
-                    verifyOtp.isPending ||
-                    sendEmail.isPending
-                  }
+                  // onGenerateDocument={(app) => {
+                  //   setSelectedApplication(app);
+                  //   setIsDocumentDialogOpen(true);
+                  // }}
+                  // onSendEmail={(app) => {
+                  //   setSelectedApplication(app);
+                  //   setIsEmailDialogOpen(true);
+                  // }}
+                  // isGeneratePending={generateDocument.isPending}
+                  // isEmailPending={
+                  //   generateDocument.isPending ||
+                  //   sendOtp.isPending ||
+                  //   verifyOtp.isPending ||
+                  //   sendEmail.isPending
+                  // }
                 />
               ))}
             </div>

@@ -1,10 +1,8 @@
 import { Outlet, Link, useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import {
-  PieChart,
   Home,
   User,
-  FileText,
   LogOut,
   X,
   MessageCircle,
