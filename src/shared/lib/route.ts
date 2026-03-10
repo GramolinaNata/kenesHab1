@@ -48,3 +48,6 @@ export const AuthLayout = lazy(() => import("../../pages/auth/layout"));
 export const MainLayout = lazy(() => import("../../pages/main/layout"));
 export const DetaliLayout = lazy(() => import("../../pages/detali/layout"));
 export const MFOLayout = lazy(() => import("../../pages/mfo/layout"));
+
+
+export const Specialist = lazy(() => import("../../pages/main/specialist/specialist"));

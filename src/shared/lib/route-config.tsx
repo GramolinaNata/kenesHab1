@@ -25,6 +25,7 @@ import {
   RegisterCreditor,
   RegisterLawyer,
   Lawyer,
+  Specialist,
 } from "../lib/route";
 
 import { ProtectedRoute, AuthRoute } from "../components/ProtectedRoute";
@@ -45,6 +46,11 @@ export const routes: RouteObject[] = [
           { path: "register/lawyer", element: <RegisterLawyer /> },
           { path: "select", element: <Select /> },
         ],
+      },
+      {
+        path: "/",
+
+        children: [{ path: "specialist", element: <Specialist /> }],
       },
     ],
   },
