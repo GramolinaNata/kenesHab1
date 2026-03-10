@@ -632,7 +632,7 @@ export default function Profile() {
       </div>
 
       {/* Раздел: Документ (только для borrower) */}
-      {userRole === "borrower" && (
+      {/* {userRole === "borrower" && (
         <div className="mb-10">
           <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -690,7 +690,7 @@ export default function Profile() {
 
           <Separator className="my-8" />
         </div>
-      )}
+      )} */}
 
       {/* Раздел: Контакт и платеж (общий) */}
       <div className="mb-10">

@@ -225,12 +225,12 @@ export default function MainLayout() {
               {/* Menu */}
               <nav className="flex-1 p-3">
                 <div className="space-y-1">
-                  <MenuItem
+                  {/* <MenuItem
                     icon={PieChart}
                     label="Аналитика"
                     href="/"
                     onClick={() => setOpen(false)}
-                  />
+                  /> */}
                   <MenuItem
                     icon={Home}
                     label="Главный"
@@ -243,12 +243,12 @@ export default function MainLayout() {
                     href="/profile"
                     onClick={() => setOpen(false)}
                   />
-                  <MenuItem
+                  {/* <MenuItem
                     icon={FileText}
                     label="Заявления"
                     href="/requests"
                     onClick={() => setOpen(false)}
-                  />
+                  /> */}
 
                   {/* Пункт "Мои обращения" только для юристов */}
                   {isLawyer && (
