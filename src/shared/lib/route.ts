@@ -51,3 +51,6 @@ export const MFOLayout = lazy(() => import("../../pages/mfo/layout"));
 
 
 export const Specialist = lazy(() => import("../../pages/main/specialist/specialist"));
+
+
+export const Dasboard = lazy(() => import("../../pages/dasboard/dasboard"));
