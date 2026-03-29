@@ -44,7 +44,7 @@ const Navigation = () => {
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <Scale className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
+           
             <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               KenesHab
             </span>
@@ -72,7 +72,7 @@ const Navigation = () => {
               Войти
             </button>
             <button
-              onClick={() => navigate("/auth/register")}
+              onClick={() => navigate("/auth/select")}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg shadow-blue-600/20"
             >
               Начать бесплатно
@@ -117,7 +117,7 @@ const Navigation = () => {
               </button>
               <button
                 onClick={() => {
-                  navigate("/auth/register");
+                  navigate("/auth/select");
                   setIsMenuOpen(false);
                 }}
                 className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors text-center"
@@ -857,7 +857,7 @@ const Footer = () => {
           {/* Logo */}
           <div className="col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <Scale className="w-6 h-6 text-blue-400" />
+              
               <span className="text-xl font-bold">KenesHab</span>
             </div>
             <p className="text-sm text-gray-400 mb-4">

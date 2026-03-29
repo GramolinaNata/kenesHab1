@@ -177,7 +177,7 @@ export default function MainLayout() {
             >
               <Menu className="w-5 h-5 text-gray-600" />
             </button>
-            <img src="/logo.png" alt="" />
+            {/* <img src="/logo.png" alt="" /> */}
           </div>
         </div>
       </header>
@@ -211,7 +211,7 @@ export default function MainLayout() {
             <div className="flex flex-col h-full">
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-gray-100">
-                <img src="/logo.png" alt="" />
+                {/* <img src="/logo.png" alt="" /> */}
                 <button
                   onClick={() => setOpen(false)}
                   className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-50 active:bg-gray-100"
