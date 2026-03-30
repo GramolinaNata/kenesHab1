@@ -23,6 +23,8 @@ import {
   PlayCircle,
   Send,
   HelpCircle,
+  Search,
+  XCircle,
 } from "lucide-react";
 
 // Компонент навигации
@@ -33,7 +35,6 @@ const Navigation = () => {
   const navItems = [
     { name: "Как это работает", href: "#process" },
     { name: "Преимущества", href: "#features" },
-    { name: "Тарифы", href: "#pricing" },
     { name: "Отзывы", href: "#testimonials" },
   ];
 
@@ -43,7 +44,6 @@ const Navigation = () => {
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo */}
           <div className="flex items-center gap-2">
-           
             <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               KenesHab
             </span>
@@ -131,14 +131,75 @@ const Navigation = () => {
   );
 };
 
-// Компонент баннера
+// Компонент баннера с интегрированным поиском
 const Banner = () => {
   const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [response, setResponse] = useState("");
+  const [isError, setIsError] = useState(false);
+  const [showResponse, setShowResponse] = useState(false);
+
+  const handleAnalyze = async () => {
+    if (!query.trim()) return;
+    
+    setIsLoading(true);
+    setResponse("");
+    setIsError(false);
+    setShowResponse(true);
+    
+    try {
+      const res = await fetch('https://keneshub.ziz.kz/api/ai/chat/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: query }),
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        setResponse(data.reply);
+        setIsError(false);
+      } else {
+        setResponse('Произошла ошибка при анализе. Пожалуйста, попробуйте еще раз позже.');
+        setIsError(true);
+      }
+    } catch (error) {
+      setResponse('Не удалось подключиться к сервису анализа.');
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStartFree = async () => {
+    if (query.trim()) {
+      await handleAnalyze();
+      // Don't navigate immediately, let user see the response
+    } else {
+      navigate("/auth/select");
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !isLoading) {
+      handleAnalyze();
+    }
+  };
+
+  const closeResponse = () => {
+    setShowResponse(false);
+    setResponse("");
+  };
+
+  const proceedToRegister = () => {
+    navigate("/auth/select");
+  };
 
   return (
     <section className="pt-24 sm:pt-28 md:pt-32 pb-12 sm:pb-16 md:pb-20 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       <div className="container mx-auto px-4 sm:px-6">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
           {/* Left Content */}
           <div className="space-y-6 sm:space-y-8">
             {/* Badge */}
@@ -161,6 +222,83 @@ const Banner = () => {
               задолженности. ИИ автоматически составит юридически грамотное
               заявление по нормам законодательства РК.
             </p>
+
+            {/* Search Box */}
+            <div className="relative">
+              <div className="flex items-center gap-2 bg-white rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-shadow p-1.5 pl-4">
+                <Search className="w-5 h-5 text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Опишите вашу ситуацию..."
+                  className="flex-1 bg-transparent border-none outline-none text-gray-700 placeholder:text-gray-400 py-3"
+                  disabled={isLoading}
+                />
+                <button
+                  onClick={handleAnalyze}
+                  disabled={isLoading || !query.trim()}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                      <span>Анализ...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Анализировать</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* AI Response Modal */}
+              {showResponse && response && (
+                <div className="absolute top-full left-0 right-0 mt-4 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-20">
+                  <div className="p-5">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                          <Sparkles className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">Анализ KenesHab AI</h3>
+                          <p className="text-xs text-gray-500">ИИ-ассистент</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={closeResponse}
+                        className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <XCircle className="w-5 h-5 text-gray-400" />
+                      </button>
+                    </div>
+                    
+                    <div className={`p-4 rounded-xl mb-4 ${isError ? 'bg-red-50' : 'bg-gray-50'}`}>
+                      <p className={`text-sm leading-relaxed ${isError ? 'text-red-700' : 'text-gray-700'}`}>
+                        {response}
+                      </p>
+                    </div>
+
+                    {!isError && (
+                      <button
+                        onClick={proceedToRegister}
+                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span>Продолжить регистрацию</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3 sm:gap-4">
@@ -193,13 +331,21 @@ const Banner = () => {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <button
-                onClick={() => navigate("/auth/login")}
+                onClick={handleStartFree}
                 className="group px-6 sm:px-8 py-3 sm:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all shadow-lg shadow-blue-600/20 hover:shadow-xl flex items-center justify-center gap-2"
               >
                 <span>Начать бесплатно</span>
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
-              <button className="px-6 sm:px-8 py-3 sm:py-4 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-semibold transition-all border border-gray-200 flex items-center justify-center gap-2">
+              <button 
+                onClick={() => {
+                  const processSection = document.getElementById('process');
+                  if (processSection) {
+                    processSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="px-6 sm:px-8 py-3 sm:py-4 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-semibold transition-all border border-gray-200 flex items-center justify-center gap-2"
+              >
                 <PlayCircle className="w-5 h-5" />
                 <span>Как это работает</span>
               </button>
@@ -556,125 +702,6 @@ const FeaturesSection = () => {
   );
 };
 
-// Компонент тарифов
-const PricingSection = () => {
-  const plans = [
-    {
-      name: "Базовый",
-      price: "Бесплатно",
-      period: "/ документ",
-      description: "Для первых шагов",
-      features: ["Подача заявления", "Базовые шаблоны", "Просмотр статуса"],
-      popular: false,
-      cta: "Начать бесплатно",
-    },
-    {
-      name: "Стандарт",
-      price: "3 000 ₸",
-      period: "/ документ",
-      description: "Оптимальный выбор",
-      features: [
-        "Подача заявления",
-        "Ускоренное рассмотрение",
-        "ИИ-генерация документов",
-        "Email-уведомления",
-      ],
-      popular: true,
-      cta: "Выбрать тариф",
-    },
-    {
-      name: "Про",
-      price: "7 000 ₸",
-      period: "/ документ",
-      description: "Полное сопровождение",
-      features: [
-        "Ускоренное рассмотрение",
-        "Помощь юриста",
-        "Безлимитные заявления",
-        "Приоритетная поддержка",
-        "ЭЦП-подпись",
-      ],
-      popular: false,
-      cta: "Выбрать тариф",
-    },
-  ];
-
-  return (
-    <section id="pricing" className="py-16 sm:py-20 bg-gray-50">
-      <div className="container mx-auto px-4 sm:px-6">
-        {/* Header */}
-        <div className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
-          <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium mb-4">
-            <Sparkles className="w-4 h-4" />
-            <span>💎 Тарифы</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
-            Начните бесплатно или выберите план с{" "}
-            <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-              расширенными возможностями
-            </span>
-          </h2>
-        </div>
-
-        {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {plans.map((plan, index) => (
-            <div
-              key={index}
-              className={`relative bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all ${
-                plan.popular
-                  ? "ring-2 ring-blue-500 scale-105 md:scale-105"
-                  : ""
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium">
-                  Популярный
-                </div>
-              )}
-
-              {/* Header */}
-              <div className="text-center mb-6">
-                <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-                <p className="text-sm text-gray-600 mb-4">{plan.description}</p>
-                <div className="flex items-end justify-center gap-1">
-                  <span className="text-3xl font-bold">{plan.price}</span>
-                  {plan.period && (
-                    <span className="text-sm text-gray-500 mb-1">
-                      {plan.period}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Features */}
-              <ul className="space-y-3 mb-6">
-                {plan.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-center gap-2 text-sm">
-                    <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {/* CTA */}
-              <button
-                className={`w-full py-3 rounded-xl font-semibold transition-all ${
-                  plan.popular
-                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20"
-                    : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                }`}
-              >
-                {plan.cta}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
-
 // Компонент отзывов
 const TestimonialsSection = () => {
   const testimonials = [
@@ -856,7 +883,6 @@ const Footer = () => {
           {/* Logo */}
           <div className="col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              
               <span className="text-xl font-bold">KenesHab</span>
             </div>
             <p className="text-sm text-gray-400 mb-4">
@@ -890,14 +916,6 @@ const Footer = () => {
                     className="hover:text-white transition-colors"
                   >
                     Преимущества
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#pricing"
-                    className="hover:text-white transition-colors"
-                  >
-                    Тарифы
                   </a>
                 </li>
               </ul>
@@ -963,7 +981,6 @@ export default function Specialist() {
       <ProblemSection />
       <ProcessSection />
       <FeaturesSection />
-      <PricingSection />
       <TestimonialsSection />
       <FAQSection />
       <Footer />
@@ -989,6 +1006,17 @@ export default function Specialist() {
           -webkit-line-clamp: 4;
           -webkit-box-orient: vertical;
           overflow: hidden;
+        }
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
         }
       `}</style>
     </div>
