@@ -7,7 +7,6 @@ import {
   Zap,
   ArrowRight,
   CheckCircle,
-  Scale,
   Landmark,
   Users,
   TrendingUp,
