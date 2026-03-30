@@ -44,9 +44,8 @@ const Navigation = () => {
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-              KenesHab
-            </span>
+            <img src="/logo6.png" className="h-10" />
+      
           </div>
 
           {/* Desktop Navigation */}
@@ -770,7 +769,8 @@ const Footer = () => {
       <div className="container mx-auto px-4 sm:px-6">
         <div className="grid md:grid-cols-4 gap-8">
           <div className="col-span-1">
-            <div className="flex items-center gap-2 mb-4"><span className="text-xl font-bold">KenesHab</span></div>
+
+            <div className="flex items-center gap-2 mb-4">            <img src="/logo6.png" className="h-10" /></div>
             <p className="text-sm text-blue-200 mb-4">Цифровой сервис досудебного урегулирования задолженности с использованием ИИ.</p>
             <div className="flex gap-4"><div className="w-8 h-8 bg-blue-800 rounded-lg" /><div className="w-8 h-8 bg-blue-800 rounded-lg" /><div className="w-8 h-8 bg-blue-800 rounded-lg" /></div>
           </div>
