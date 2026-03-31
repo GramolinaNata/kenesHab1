@@ -289,7 +289,7 @@ export default function MainLayout() {
 
       {/* Chat Modal */}
       {chatOpen && (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-50 ">
           {/* Overlay */}
           <div
             className="absolute inset-0 bg-black/20"
@@ -297,7 +297,8 @@ export default function MainLayout() {
           />
 
           {/* Chat Container */}
-          <div className="absolute bottom-0 left-0 right-0 h-[85vh] bg-white rounded-t-2xl shadow-2xl flex flex-col">
+         {/* Chat Container */}
+<div className="absolute bottom-0 left-0 right-0 h-[85vh] bg-white rounded-t-2xl shadow-2xl flex flex-col md:max-w-[450px] md:right-6 md:left-auto md:bottom-6 md:h-[700px] md:rounded-2xl border border-gray-200">
             {/* Header */}
             <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-2xl">
               <div className="flex items-center justify-between">

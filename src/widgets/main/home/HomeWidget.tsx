@@ -504,7 +504,7 @@ export default function HomeWidget() {
 
       {/* Секция "Мои заявки" - только для creditor и borrower */}
       {canViewApplications && (
-        <div className="mt-10 w-full">
+<div className="max-w-[575px] mx-auto w-full mt-10">
           <div className="flex justify-between items-center mb-4">
             <span className="text-black font-semibold text-[22px]">
               Мои заявки
@@ -514,7 +514,7 @@ export default function HomeWidget() {
             </span>
           </div>
 
-          {isLoading ? (
+         {isLoading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1f74ec] mx-auto"></div>
               <p className="mt-2 text-gray-500">Загрузка заявок...</p>
@@ -555,12 +555,14 @@ export default function HomeWidget() {
               </p>
             </div>
           )}
+
+   
         </div>
       )}
 
       {/* Секция "Объявления" - только для lawyer и borrower */}
       {canViewAnnouncements && (
-        <div className="mt-10 w-full">
+<div className="max-w-[575px] mx-auto w-full mt-10">
           <div className="flex justify-between items-center">
             <span className="text-black font-semibold text-[22px]">
               Объявления
