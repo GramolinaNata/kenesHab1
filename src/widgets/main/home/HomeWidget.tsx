@@ -13,46 +13,54 @@ import {
   useDocumentPreview,
   useApplicationUploadContract,
 } from "@/features/application/hooks/useApplication";
-import { AppealCard } from "@/shared/components/block/AppealCard";
-
-import { AlertCircle } from "lucide-react";
-
+import { AlertCircle, FileText, User, MessageSquare, Shield } from "lucide-react";
 import { EditApplicationDialog } from "@/shared/components/dialogs/EditApplicationDialog";
 import { DeleteConfirmationDialog } from "@/shared/components/dialogs/DeleteConfirmationDialog";
 import { GenerateDocumentDialog } from "@/shared/components/dialogs/GenerateDocumentDialog";
 import { SendEmailDialog } from "@/shared/components/dialogs/SendEmailDialog";
 import { OtpDialog } from "@/shared/components/dialogs/OtpDialog";
 import { StatusChangeDialog } from "@/shared/components/dialogs/StatusChangeDialog";
-
-import {
-  generatePdfFileName,
-  copyToClipboard,
-} from "@/features/application/utils/application";
+import { generatePdfFileName, copyToClipboard } from "@/features/application/utils/application";
 import { useApplicationDialogs } from "@/features/application/hooks/useApplicationDialogs";
 import { CreateApplicationDialog } from "@/shared/components/dialogs/CreateApplicationDialog";
 import { PDFPreview } from "@/shared/components/block/PDFPreview";
 import { ApplicationCard } from "@/shared/components/block/ApplicationCard";
-import {
-  MOCK_TEMPLATES,
-  TEMPLATE_ID_BY_CARD_TYPE,
-} from "@/features/application/constants/application";
-import {
-  AppealDialog,
-  type AppealType,
-} from "@/shared/components/dialogs/AppealDialog";
+import { MOCK_TEMPLATES, TEMPLATE_ID_BY_CARD_TYPE } from "@/features/application/constants/application";
+import { AppealDialog, type AppealType } from "@/shared/components/dialogs/AppealDialog";
 import LawyerRequestsList from "@/shared/components/block/LawyerRequestsList";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+const SectionTitle = ({ children }: { children: string }) => (
+  <span className="inline-block text-[22px] font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+    {children}
+  </span>
+);
+
+const ArrowIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#185FA5" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 12h14M12 5l7 7-7 7"/>
+  </svg>
+);
+
+const ArrowButton = () => (
+  <div className="w-7 h-7 rounded-full bg-[#EBF4FF] flex items-center justify-center flex-shrink-0">
+    <ArrowIcon />
+  </div>
+);
+
+const CardIcon = ({ icon }: { icon: React.ReactNode }) => (
+  <div className="w-[38px] h-[38px] rounded-[10px] bg-[#EBF4FF] flex items-center justify-center flex-shrink-0 text-blue-700">
+    {icon}
+  </div>
+);
+
 export default function HomeWidget() {
-  // Получаем роли пользователя из localStorage
   const userRoles = JSON.parse(localStorage.getItem("userRoles") || "[]");
   const isBorrower = userRoles.includes("borrower");
   const isCreditor = userRoles.includes("creditor");
   const isLawyer = userRoles.includes("lawyer");
-
-  // Показывать заявки могут creditor и borrower
   const canViewApplications = isBorrower || isCreditor;
-
-  // Показывать объявления могут lawyer и borrower
   const canViewAnnouncements = isLawyer || isBorrower;
 
   const { data: applicationsData, isLoading } = useApplications();
@@ -69,109 +77,57 @@ export default function HomeWidget() {
   const [pdfBlob, setPdfBlob] = useState(null);
   const [pdfFileName, setPdfFileName] = useState<string>("document.pdf");
   const [, setIsPdfLoading] = useState(false);
-
-  // Состояния для диалогов обращений
-  const [appealDialog, setAppealDialog] = useState<{
-    isOpen: boolean;
-    type: AppealType;
-  }>({
-    isOpen: false,
-    type: "lawyer",
-  });
+  const [appealDialog, setAppealDialog] = useState<{ isOpen: boolean; type: AppealType }>({ isOpen: false, type: "lawyer" });
 
   const {
-    // States
-    isCreateDialogOpen,
-    setIsCreateDialogOpen,
-    isEditDialogOpen,
-    setIsEditDialogOpen,
-    isDeleteDialogOpen,
-    setIsDeleteDialogOpen,
-    isDocumentDialogOpen,
-    setIsDocumentDialogOpen,
-    isEmailDialogOpen,
-    setIsEmailDialogOpen,
-    isOtpDialogOpen,
-    setIsOtpDialogOpen,
-    isStatusDialogOpen,
-    setIsStatusDialogOpen,
-    selectedApplication,
-    setSelectedApplication,
-    setApplicationType,
-    statusChangeData,
-    otpCode,
-    setOtpCode,
-    setIsOtpSent,
-    emailProcessStep,
-    setEmailProcessStep,
-    selectedType,
-    setSelectedType,
-
-    // Forms
-    createForm,
-    editForm,
-    otpForm,
-
-    // Reset functions
-    resetCreateDialog,
-    resetEditDialog,
-    resetDeleteDialog,
-    resetDocumentDialog,
-    resetEmailDialog,
-    resetOtpDialog,
-    resetStatusDialog,
+    isCreateDialogOpen, setIsCreateDialogOpen,
+    isEditDialogOpen, setIsEditDialogOpen,
+    isDeleteDialogOpen, setIsDeleteDialogOpen,
+    isDocumentDialogOpen, setIsDocumentDialogOpen,
+    isEmailDialogOpen, setIsEmailDialogOpen,
+    isOtpDialogOpen, setIsOtpDialogOpen,
+    isStatusDialogOpen, setIsStatusDialogOpen,
+    selectedApplication, setSelectedApplication,
+    setApplicationType, statusChangeData,
+    otpCode, setOtpCode, setIsOtpSent,
+    emailProcessStep, setEmailProcessStep,
+    selectedType, setSelectedType,
+    createForm, editForm, otpForm,
+    resetCreateDialog, resetEditDialog, resetDeleteDialog,
+    resetDocumentDialog, resetEmailDialog, resetOtpDialog, resetStatusDialog,
   } = useApplicationDialogs();
 
-  const { data: creditors, isLoading: isLoadingCreditors } = useCreditors(
-    selectedType || undefined,
-  );
-
+  const { data: creditors, isLoading: isLoadingCreditors } = useCreditors(selectedType || undefined);
   const documentPreview = useDocumentPreview();
 
   const handleCardClick = (type: string) => {
     setApplicationType(type);
-
-    // Для lawyer, mediator, ombudsman открываем универсальный диалог
     if (type === "lawyer" || type === "mediator" || type === "ombudsman") {
-      setAppealDialog({
-        isOpen: true,
-        type: type as AppealType,
-      });
+      setAppealDialog({ isOpen: true, type: type as AppealType });
       return;
     }
-
-    // Для остальных типов открываем обычный диалог создания заявки
     const templateId = TEMPLATE_ID_BY_CARD_TYPE[type];
-    if (templateId) {
-      createForm.setValue("template", templateId);
-    }
+    if (templateId) createForm.setValue("template", templateId);
     setIsCreateDialogOpen(true);
   };
 
   const handleGeneratePDF = async (data: any) => {
     try {
       setIsPdfLoading(true);
-
       const creditor = creditors?.find((c: any) => c.id === data.creditor);
       const creditorName = creditor?.name || "creditor";
       const template = MOCK_TEMPLATES.find((t: any) => t.id === data.template);
       const templateName = template?.name || "document";
-
       const fileName = generatePdfFileName(creditorName, templateName);
       const blob = await documentPreview.mutateAsync({
-        creditor: data.creditor,
-        amount: data.amount,
-        comment: data.comment,
-        template: data.template,
-        bank_email: data.bank_email,
-        contract_date: data.contract_date,
-        contract_number: data.contract_number,
+        creditor: data.creditor, amount: data.amount, comment: data.comment,
+        template: data.template, bank_email: data.bank_email,
+        contract_date: data.contract_date, contract_number: data.contract_number,
       });
-
       setPdfBlob(blob);
       setPdfFileName(fileName);
     } catch (error) {
-      console.error("Ошибка при генерации PDF:", error);
+      console.error(error);
       alert("Ошибка при генерации PDF. Пожалуйста, попробуйте снова.");
     } finally {
       setIsPdfLoading(false);
@@ -180,13 +136,7 @@ export default function HomeWidget() {
 
   const handleEdit = (application: any) => {
     setSelectedApplication(application);
-    editForm.reset({
-      creditor: application.creditor,
-      amount: parseFloat(application.amount),
-      comment: "",
-      template: 1,
-      bank_email: "",
-    });
+    editForm.reset({ creditor: application.creditor, amount: parseFloat(application.amount), comment: "", template: 1, bank_email: "" });
     setIsEditDialogOpen(true);
   };
 
@@ -201,9 +151,7 @@ export default function HomeWidget() {
         await deleteApplication.mutateAsync(selectedApplication.id);
         resetDeleteDialog();
         setIsDeleteDialogOpen(false);
-      } catch (error) {
-        console.error("Ошибка при удалении заявки:", error);
-      }
+      } catch (error) { console.error(error); }
     }
   };
 
@@ -212,28 +160,23 @@ export default function HomeWidget() {
       await generateDocument.mutateAsync(applicationId);
       setIsDocumentDialogOpen(false);
       resetDocumentDialog();
-    } catch (error) {
-      console.error("Ошибка при генерации документа:", error);
-    }
+    } catch (error) { console.error(error); }
   };
 
   const startEmailProcess = async (applicationId: number) => {
     try {
       setEmailProcessStep("generating_document");
       await generateDocument.mutateAsync(applicationId);
-
       setEmailProcessStep("sending_otp");
       const otpResult = await sendOtp.mutateAsync(applicationId);
       const code = otpResult?.code || otpResult?.dev_code || "123456";
-
       setOtpCode(code);
       setIsOtpSent(true);
       setEmailProcessStep("verifying_otp");
-
       setIsEmailDialogOpen(false);
       setIsOtpDialogOpen(true);
     } catch (error) {
-      console.error("Ошибка в процессе отправки email:", error);
+      console.error(error);
       setEmailProcessStep("generating_document");
     }
   };
@@ -241,79 +184,48 @@ export default function HomeWidget() {
   const handleVerifyOtp = async (applicationId: number, code: string) => {
     try {
       setEmailProcessStep("verifying_otp");
-      await verifyOtp.mutateAsync({
-        id: applicationId,
-        payload: { code },
-      });
-
+      await verifyOtp.mutateAsync({ id: applicationId, payload: { code } });
       setEmailProcessStep("sending_email");
       await sendEmail.mutateAsync(applicationId);
-
       setEmailProcessStep("completed");
-
-      setTimeout(() => {
-        setIsOtpDialogOpen(false);
-        resetOtpDialog();
-      }, 1500);
-    } catch (error) {
-      console.error("Ошибка при верификации OTP:", error);
-    }
+      setTimeout(() => { setIsOtpDialogOpen(false); resetOtpDialog(); }, 1500);
+    } catch (error) { console.error(error); }
   };
 
   const confirmStatusChange = async () => {
     if (statusChangeData) {
       try {
-        await setApplicationStatus.mutateAsync({
-          id: statusChangeData.id,
-          payload: { status: statusChangeData.newStatus },
-        });
+        await setApplicationStatus.mutateAsync({ id: statusChangeData.id, payload: { status: statusChangeData.newStatus } });
         setIsStatusDialogOpen(false);
         resetStatusDialog();
-      } catch (error) {
-        console.error("Ошибка при изменении статуса:", error);
-      }
+      } catch (error) { console.error(error); }
     }
   };
 
   const onCreateSubmit = async (data: any) => {
     try {
-      const result = await createApplication.mutateAsync({
-        creditor: data.creditor,
-        amount: data.amount,
-        comment: data.comment,
-        template: data.template,
-        bank_email: data.bank_email,
-        contract_date: data.contract_date,
-        contract_number: data.contract_number,
+      return await createApplication.mutateAsync({
+        creditor: data.creditor, amount: data.amount, comment: data.comment,
+        template: data.template, bank_email: data.bank_email,
+        contract_date: data.contract_date, contract_number: data.contract_number,
       });
-      return result;
-    } catch (error) {
-      console.error("Ошибка при создании заявки:", error);
-      throw error;
-    }
+    } catch (error) { console.error(error); throw error; }
   };
 
   const onEditSubmit = async (data: any) => {
     if (!selectedApplication) return;
-
     try {
       await updateApplication.mutateAsync({
         id: selectedApplication.id,
         payload: {
-          creditor: data.creditor,
-          amount: data.amount,
-          comment: data.comment,
-          template: data.template,
-          bank_email: data.bank_email,
-          contract_date: data.contract_date,
-          contract_number: data.contract_number,
+          creditor: data.creditor, amount: data.amount, comment: data.comment,
+          template: data.template, bank_email: data.bank_email,
+          contract_date: data.contract_date, contract_number: data.contract_number,
         },
       });
       setIsEditDialogOpen(false);
       resetEditDialog();
-    } catch (error) {
-      console.error("Ошибка при обновлении заявки:", error);
-    }
+    } catch (error) { console.error(error); }
   };
 
   const onOtpSubmit = async (data: any) => {
@@ -321,263 +233,179 @@ export default function HomeWidget() {
     await handleVerifyOtp(selectedApplication.id, data.code);
   };
 
-  const closeAppealDialog = () => {
-    setAppealDialog({ ...appealDialog, isOpen: false });
-  };
-
   return (
-    <div className="w-full min-h-screen flex flex-col items-center mt-5">
-      <CreateApplicationDialog
-        isOpen={isCreateDialogOpen}
-        onClose={() => {
-          setIsCreateDialogOpen(false);
-          resetCreateDialog();
-        }}
-        selectedType={selectedType}
-        setSelectedType={setSelectedType}
-        creditors={creditors || []}
-        isLoadingCreditors={isLoadingCreditors}
-        createForm={createForm}
-        documentPreview={documentPreview}
-        onGeneratePDF={handleGeneratePDF}
-        createApplication={createApplication}
-        onSubmit={onCreateSubmit}
-        uploadContract={uploadContract}
-        generateDocument={generateDocument}
-        sendOtp={sendOtp}
-        verifyOtp={verifyOtp}
-        sendEmail={sendEmail}
-      />
+    <div className="w-full min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
+      <div className="flex flex-col items-center pt-5 pb-10">
 
-      <EditApplicationDialog
-        isOpen={isEditDialogOpen}
-        onClose={() => {
-          setIsEditDialogOpen(false);
-          resetEditDialog();
-        }}
-        selectedApplication={selectedApplication}
-        editForm={editForm}
-        updateApplication={updateApplication}
-        onSubmit={onEditSubmit}
-      />
+        <CreateApplicationDialog
+          isOpen={isCreateDialogOpen}
+          onClose={() => { setIsCreateDialogOpen(false); resetCreateDialog(); }}
+          selectedType={selectedType} setSelectedType={setSelectedType}
+          creditors={creditors || []} isLoadingCreditors={isLoadingCreditors}
+          createForm={createForm} documentPreview={documentPreview}
+          onGeneratePDF={handleGeneratePDF} createApplication={createApplication}
+          onSubmit={onCreateSubmit} uploadContract={uploadContract}
+          generateDocument={generateDocument} sendOtp={sendOtp}
+          verifyOtp={verifyOtp} sendEmail={sendEmail}
+        />
+        <EditApplicationDialog
+          isOpen={isEditDialogOpen}
+          onClose={() => { setIsEditDialogOpen(false); resetEditDialog(); }}
+          selectedApplication={selectedApplication} editForm={editForm}
+          updateApplication={updateApplication} onSubmit={onEditSubmit}
+        />
+        <DeleteConfirmationDialog
+          isOpen={isDeleteDialogOpen}
+          onClose={() => { setIsDeleteDialogOpen(false); resetDeleteDialog(); }}
+          selectedApplication={selectedApplication} deleteApplication={deleteApplication}
+          onConfirm={confirmDelete}
+        />
+        <GenerateDocumentDialog
+          isOpen={isDocumentDialogOpen}
+          onClose={() => { setIsDocumentDialogOpen(false); resetDocumentDialog(); }}
+          selectedApplication={selectedApplication} generateDocument={generateDocument}
+          onGenerate={handleGenerateDocument}
+        />
+        <SendEmailDialog
+          isOpen={isEmailDialogOpen}
+          onClose={() => { setIsEmailDialogOpen(false); resetEmailDialog(); }}
+          selectedApplication={selectedApplication} generateDocument={generateDocument}
+          sendOtp={sendOtp} emailProcessStep={emailProcessStep} onStart={startEmailProcess}
+        />
+        <OtpDialog
+          isOpen={isOtpDialogOpen}
+          onClose={() => { setIsOtpDialogOpen(false); resetOtpDialog(); }}
+          applicationId={selectedApplication?.id} otpCode={otpCode}
+          emailProcessStep={emailProcessStep} otpForm={otpForm}
+          verifyOtp={verifyOtp} sendEmail={sendEmail}
+          copyToClipboard={copyToClipboard} onSubmit={onOtpSubmit}
+        />
+        <StatusChangeDialog
+          isOpen={isStatusDialogOpen}
+          onClose={() => { setIsStatusDialogOpen(false); resetStatusDialog(); }}
+          statusChangeData={statusChangeData} setApplicationStatus={setApplicationStatus}
+          onConfirm={confirmStatusChange}
+        />
+        <AppealDialog
+          isOpen={appealDialog.isOpen}
+          onClose={() => setAppealDialog({ ...appealDialog, isOpen: false })}
+          type={appealDialog.type}
+        />
+        <PDFPreview
+          pdfBlob={pdfBlob} fileName={pdfFileName}
+          onClose={() => setPdfBlob(null)}
+          preventCloseOnOverlayClick={isCreateDialogOpen}
+        />
 
-      <DeleteConfirmationDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => {
-          setIsDeleteDialogOpen(false);
-          resetDeleteDialog();
-        }}
-        selectedApplication={selectedApplication}
-        deleteApplication={deleteApplication}
-        onConfirm={confirmDelete}
-      />
-
-      <GenerateDocumentDialog
-        isOpen={isDocumentDialogOpen}
-        onClose={() => {
-          setIsDocumentDialogOpen(false);
-          resetDocumentDialog();
-        }}
-        selectedApplication={selectedApplication}
-        generateDocument={generateDocument}
-        onGenerate={handleGenerateDocument}
-      />
-
-      <SendEmailDialog
-        isOpen={isEmailDialogOpen}
-        onClose={() => {
-          setIsEmailDialogOpen(false);
-          resetEmailDialog();
-        }}
-        selectedApplication={selectedApplication}
-        generateDocument={generateDocument}
-        sendOtp={sendOtp}
-        emailProcessStep={emailProcessStep}
-        onStart={startEmailProcess}
-      />
-
-      <OtpDialog
-        isOpen={isOtpDialogOpen}
-        onClose={() => {
-          setIsOtpDialogOpen(false);
-          resetOtpDialog();
-        }}
-        applicationId={selectedApplication?.id}
-        otpCode={otpCode}
-        emailProcessStep={emailProcessStep}
-        otpForm={otpForm}
-        verifyOtp={verifyOtp}
-        sendEmail={sendEmail}
-        copyToClipboard={copyToClipboard}
-        onSubmit={onOtpSubmit}
-      />
-
-      <StatusChangeDialog
-        isOpen={isStatusDialogOpen}
-        onClose={() => {
-          setIsStatusDialogOpen(false);
-          resetStatusDialog();
-        }}
-        statusChangeData={statusChangeData}
-        setApplicationStatus={setApplicationStatus}
-        onConfirm={confirmStatusChange}
-      />
-
-      {/* Универсальный диалог для обращений */}
-      <AppealDialog
-        isOpen={appealDialog.isOpen}
-        onClose={closeAppealDialog}
-        type={appealDialog.type}
-      />
-
-      <PDFPreview
-        pdfBlob={pdfBlob}
-        fileName={pdfFileName}
-        onClose={() => setPdfBlob(null)}
-        preventCloseOnOverlayClick={isCreateDialogOpen}
-      />
-
-      {/* Отображаем AppealCard только для роли borrower */}
-      {isBorrower && (
-        <div className="flex flex-col gap-4">
-          <div
-            onClick={() => handleCardClick("statement")}
-            className="cursor-pointer"
-          >
-            <AppealCard
-              variant="big"
-              title="Реструктуризация/урегулирование просроченной задолженности"
-              subtitle="Решим любые проблемы с МФО"
-              image="/blocknout.svg"
-              href="#"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div
-              onClick={() => handleCardClick("lawyer")}
-              className="cursor-pointer"
-            >
-              <AppealCard
-                title={
-                  <>
-                    Обратиться <br /> к юристу
-                  </>
-                }
-                image="/man.svg"
-                href="#"
-              />
+        {isBorrower && (
+          <div className="w-full max-w-[660px] px-4 mt-2">
+            <div className="mb-4">
+              <SectionTitle>Обращения</SectionTitle>
             </div>
-            <div
-              onClick={() => handleCardClick("mediator")}
-              className="cursor-pointer"
-            >
-              <AppealCard
-                title={
-                  <>
-                    Обратиться <br /> к медиатору
-                  </>
-                }
-                image="/man.svg"
-                href="#"
-              />
+            <div className="grid grid-cols-2 gap-[10px]">
+
+              <div
+                onClick={() => handleCardClick("statement")}
+                className="col-span-2 cursor-pointer bg-white rounded-[18px] border border-[#dde8f5] hover:border-blue-400 hover:shadow-md transition-all flex items-center gap-[14px] px-[22px] py-5"
+              >
+                <CardIcon icon={<FileText size={18} />} />
+                <div className="flex-1">
+                  <p className="text-[14px] font-semibold text-[#0C447C] leading-[1.45]">
+                    Реструктуризация / урегулирование просроченной задолженности
+                  </p>
+                  <p className="text-[11px] text-[#93bfe0] mt-[3px]">Решим любые проблемы с МФО</p>
+                </div>
+                <ArrowButton />
+              </div>
+
+              <div
+                onClick={() => handleCardClick("lawyer")}
+                className="cursor-pointer bg-white rounded-[18px] border border-[#dde8f5] hover:border-blue-400 hover:shadow-md transition-all flex flex-col justify-between px-[22px] py-5 min-h-[150px]"
+              >
+                <CardIcon icon={<User size={18} />} />
+                <p className="text-[14px] font-semibold text-[#0C447C] leading-[1.45] mt-3">
+                  Обратиться к юристу
+                </p>
+                <div className="self-end mt-3">
+                  <ArrowButton />
+                </div>
+              </div>
+
+              <div
+                onClick={() => handleCardClick("mediator")}
+                className="cursor-pointer bg-white rounded-[18px] border border-[#dde8f5] hover:border-blue-400 hover:shadow-md transition-all flex flex-col justify-between px-[22px] py-5 min-h-[150px]"
+              >
+                <CardIcon icon={<MessageSquare size={18} />} />
+                <p className="text-[14px] font-semibold text-[#0C447C] leading-[1.45] mt-3">
+                  Обратиться к медиатору
+                </p>
+                <div className="self-end mt-3">
+                  <ArrowButton />
+                </div>
+              </div>
+
+              <div
+                onClick={() => handleCardClick("ombudsman")}
+                className="col-span-2 cursor-pointer bg-white rounded-[18px] border border-[#dde8f5] hover:border-blue-400 hover:shadow-md transition-all flex items-center gap-[14px] px-[22px] py-5"
+              >
+                <CardIcon icon={<Shield size={18} />} />
+                <div className="flex-1">
+                  <p className="text-[14px] font-semibold text-[#0C447C] leading-[1.45]">
+                    Обратиться к омбудсмену
+                  </p>
+                </div>
+                <ArrowButton />
+              </div>
+
             </div>
           </div>
+        )}
 
-          <div
-            onClick={() => handleCardClick("ombudsman")}
-            className="cursor-pointer"
-          >
-            <AppealCard
-              variant="big"
-              title={
-                <>
-                  Обратиться <br /> к омбудсмену
-                </>
-              }
-              image="/Lawyer.svg"
-              href="#"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Секция "Мои заявки" - только для creditor и borrower */}
-      {canViewApplications && (
-<div className="max-w-[575px] mx-auto w-full mt-10">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-black font-semibold text-[22px]">
-              Мои заявки
-            </span>
-            <span className="text-[#1f74ec] text-[12px] font-bold">
-              Все заявки
-            </span>
-          </div>
-
-         {isLoading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1f74ec] mx-auto"></div>
-              <p className="mt-2 text-gray-500">Загрузка заявок...</p>
+        {canViewApplications && (
+          <div className="max-w-[660px] mx-auto w-full mt-10 px-4">
+            <div className="flex justify-between items-center mb-4">
+              <SectionTitle>Мои заявки</SectionTitle>
+              <span className="text-[#1f74ec] text-[12px] font-bold">Все заявки</span>
             </div>
-          ) : applicationsData?.results &&
-            applicationsData?.results.length > 0 ? (
-            <div className="space-y-3">
-              {applicationsData?.results.map((application: any) => (
-                <ApplicationCard
-                  key={application.id}
-                  application={application}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  // onGenerateDocument={(app) => {
-                  //   setSelectedApplication(app);
-                  //   setIsDocumentDialogOpen(true);
-                  // }}
-                  // onSendEmail={(app) => {
-                  //   setSelectedApplication(app);
-                  //   setIsEmailDialogOpen(true);
-                  // }}
-                  // isGeneratePending={generateDocument.isPending}
-                  // isEmailPending={
-                  //   generateDocument.isPending ||
-                  //   sendOtp.isPending ||
-                  //   verifyOtp.isPending ||
-                  //   sendEmail.isPending
-                  // }
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 bg-gray-50 rounded-xl">
-              <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">У вас пока нет созданных заявок</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Создайте свою первую заявку выше
-              </p>
-            </div>
-          )}
-
-   
-        </div>
-      )}
-
-      {/* Секция "Объявления" - только для lawyer и borrower */}
-      {canViewAnnouncements && (
-<div className="max-w-[575px] mx-auto w-full mt-10">
-          <div className="flex justify-between items-center">
-            <span className="text-black font-semibold text-[22px]">
-              Объявления
-            </span>
-            <span className="text-[#1f74ec] text-[12px] font-bold">
-              Подробнее
-            </span>
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1f74ec] mx-auto" />
+                <p className="mt-2 text-gray-500">Загрузка заявок...</p>
+              </div>
+            ) : applicationsData?.results && applicationsData.results.length > 0 ? (
+              <div className="space-y-3">
+                {applicationsData.results.map((application: any) => (
+                  <ApplicationCard
+                    key={application.id}
+                    application={application}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-white rounded-xl border border-blue-100">
+                <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">У вас пока нет созданных заявок</p>
+                <p className="text-sm text-gray-400 mt-1">Создайте свою первую заявку выше</p>
+              </div>
+            )}
           </div>
+        )}
 
-          <div className="mt-3.5 grid items-center gap-3">
-            <LawyerRequestsList />
+        {canViewAnnouncements && (
+          <div className="max-w-[660px] mx-auto w-full mt-10 px-4">
+            <div className="flex justify-between items-center mb-4">
+              <SectionTitle>Объявления</SectionTitle>
+              <span className="text-[#1f74ec] text-[12px] font-bold">Подробнее</span>
+            </div>
+            <div className="grid items-center gap-3">
+              <LawyerRequestsList />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+      </div>
     </div>
   );
 }
- 
